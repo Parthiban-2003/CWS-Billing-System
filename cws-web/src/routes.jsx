@@ -8,6 +8,12 @@ import Menu from '@/pages/Menu'
 import Tables from '@/pages/Tables'
 import Kitchen from '@/pages/Kitchen'
 import Waiter from '@/pages/Waiter'
+import Invoices from '@/pages/Invoices'
+import Inventory from '@/pages/Inventory'
+import Customers from '@/pages/Customers'
+import Reports from '@/pages/Reports'
+import Expenses from '@/pages/Expenses'
+
 
 export const router = createBrowserRouter([
     { path: '/', element: <Navigate to="/app" replace /> },
@@ -18,12 +24,11 @@ export const router = createBrowserRouter([
             { path: 'pos', element: <POS /> },
             { path: 'menu', element: <Menu /> },
             { path: 'tables', element: <Tables /> },
-            { path: 'invoices', element: <Placeholder title="Invoices" /> },
-            { path: 'inventory', element: <Placeholder title="Inventory" /> },
-            { path: 'customers', element: <Placeholder title="Customers" /> },
-            { path: 'reports', element: <Placeholder title="Reports" /> },
-            { path: 'expenses', element: <Placeholder title="Expenses" /> },
-            { path: 'users', element: <Placeholder title="Users & Roles" /> },
+            { path: 'invoices', element: <Invoices /> },
+            { path: 'inventory', element: <Inventory /> },
+            { path: 'customers', element: <Customers /> },
+            { path: 'reports', element: <Reports /> },
+            { path: 'expenses', element: <Expenses /> },
             { path: 'settings', element: <Settings /> },
         ],
     },
