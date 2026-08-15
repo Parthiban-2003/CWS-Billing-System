@@ -1,9 +1,23 @@
-import { cn } from '@/lib/utils'
+import { useEffect } from 'react'
+import { RouterProvider } from 'react-router-dom'
+import { Toaster } from 'sonner'
+import { router } from './routes'
+import { useSettingsStore } from '@/stores/useSettingsStore'
+import { applyTheme } from '@/theme/applyTheme'
 
 export default function App() {
+  const settings = useSettingsStore()
+
+  useEffect(() => { applyTheme(settings) }, [settings])
+
   return (
-    <div className={cn('min-h-screen bg-navy-950 text-white grid place-items-center')}>
-      <h1 className="text-3xl font-bold">CWS ✅ Alias Working!</h1>
-    </div>
+    <>
+      <RouterProvider router={router} />
+      <Toaster
+        theme="dark"
+        position="top-center"
+        toastOptions={{ style: { background: 'var(--card)', border: '1px solid var(--line)', color: 'var(--ink)' } }}
+      />
+    </>
   )
 }

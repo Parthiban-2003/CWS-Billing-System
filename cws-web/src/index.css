@@ -1,13 +1,27 @@
 @import "tailwindcss";
 
-@theme {
-  --color-navy-950: #060d1a;
-  --color-navy-900: #0a1220;
-  --color-navy-800: #101c33;
-  --color-navy-700: #1a2a4a;
-  --color-gold-400: #fbbf24;
-  --color-gold-500: #f59e0b;
-  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-mut: var(--mut);
+  --font-app: var(--app-font);
 }
 
-body { @apply bg-navy-950 text-white font-sans antialiased; }
+:root {
+  --primary: #f59e0b;
+  --primary-soft: rgba(245, 158, 11, 0.12);
+  --accent: #38bdf8;
+  --bg: #060d1a;
+  --card: #0b1424;
+  --line: rgba(255, 255, 255, 0.07);
+  --ink: #f4f7fb;
+  --mut: #8ea0b5;
+  --app-font: 'Manrope', sans-serif;
+}
+
+body { @apply bg-bg text-ink font-app antialiased; }
