@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil } from 'lucide-react'
 import { api } from '@/lib/api'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -13,9 +13,11 @@ import { inr, cn } from '@/lib/utils'
 const catOf = (id) => EXPENSE_CATS.find((c) => c.id === id) ?? { label: id, icon: '📦' }
 
 export default function Expenses() {
-    const [addOpen, setAddOpen] = useState(false)
-    const [filter, setFilter] = useState('ALL')
-    const [del, setDel] = useState(null)
+    const [addOpen, setAddOpen] = useState(false);
+    const [filter, setFilter] = useState('ALL');
+    const [del, setDel] = useState(null);
+    const [edit, setEdit] = useState(null);
+
     const qc = useQueryClient()
     const { data: expenses = [] } = useQuery({ queryKey: ['expenses'], queryFn: () => api.get('/api/expenses') })
 
@@ -88,6 +90,7 @@ export default function Expenses() {
                                 <td className="px-4 py-3"><span className="text-[10px] font-extrabold bg-primary-soft text-primary rounded-full px-2 py-0.5">{e.method}</span></td>
                                 <td className="px-4 py-3 text-right font-extrabold text-rose-400">{inr(e.amount)}</td>
                                 <td className="px-4 py-3 text-right">
+                                    <button onClick={() => setEdit(e)} className="text-mut hover:text-primary mr-2"><Pencil size={14} /></button>
                                     <button onClick={() => setDel(e.id)} className="text-mut hover:text-rose-400"><Trash2 size={14} /></button>
                                 </td>
                             </tr>
@@ -97,7 +100,8 @@ export default function Expenses() {
                 </table>
             </Card>
 
-            <ExpenseModal open={addOpen} onClose={() => setAddOpen(false)} />
+            <ExpenseModal open={addOpen || !!edit} initial={edit}
+                onClose={() => { setAddOpen(false); setEdit(null) }} />
             <ConfirmDialog open={!!del} onClose={() => setDel(null)} onConfirm={remove}
                 title="Delete expense?" message="This expense record will be removed." />
         </div>
