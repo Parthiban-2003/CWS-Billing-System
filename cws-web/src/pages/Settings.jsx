@@ -3,9 +3,10 @@ import BrandingTab from '@/components/settings/BrandingTab'
 import AppearanceTab from '@/components/settings/AppearanceTab'
 import BusinessTab from '@/components/settings/BusinessTab'
 import PreviewCard from '@/components/settings/PreviewCard'
+import CombosTab from '@/components/settings/CombosTab'
 import { cn } from '@/lib/utils'
 
-const TABS = ['Branding', 'Business', 'Appearance']
+const TABS = ['Branding', 'Business', 'Combos', 'Appearance']
 
 export default function Settings() {
     const [tab, setTab] = useState('Branding')
@@ -24,6 +25,7 @@ export default function Settings() {
                 {tab === 'Branding' && <BrandingTab />}
                 {tab === 'Business' && <BusinessTab />}
                 {tab === 'Appearance' && <AppearanceTab />}
+                {tab === 'Combos' && <CombosTab />}
             </div>
             <PreviewCard />
         </div>

@@ -26,7 +26,21 @@ export default function CustomerModal({ c, onClose }) {
 
     return (
         <Modal open={!!c} onClose={onClose} title={`👤 ${c?.name ?? ''}`} wide>
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {/* ✅ CUSTOMER STATS AT TOP (not in each row) */}
+            <div className="mb-4 p-3 rounded-lg bg-primary-soft border border-primary/30 flex items-center justify-between">
+                <div>
+                    <p className="font-extrabold">{c?.name}</p>
+                    <p className="text-xs text-mut">{c?.phone || '—'}</p>
+                </div>
+                <div className="text-right">
+                    <p className="text-primary font-extrabold">⭐ {c?.points || 0} points</p>
+                    <p className="text-xs text-mut">Total: {inr(c?.totalSpent || 0)}</p>
+                </div>
+            </div>
+
+            <p className="text-xs font-bold text-mut mb-2">🧾 Bill History</p>
+
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
                 {mine.map((v) => {
                     const due = v.total - v.paid
                     return (

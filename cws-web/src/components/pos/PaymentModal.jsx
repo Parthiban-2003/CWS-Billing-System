@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Banknote, QrCode, CreditCard, BookMinus } from 'lucide-react'
+import { Banknote, QrCode, CreditCard, BookMinus, Plus, X } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import { useCartStore } from '@/stores/useCartStore'
 import { api } from '@/lib/api'
 import { inr, cn } from '@/lib/utils'
@@ -19,35 +20,54 @@ export default function PaymentModal({ open, onClose, totals }) {
     const [method, setMethod] = useState('CASH')
     const [received, setReceived] = useState('')
     const [customerId, setCustomerId] = useState('')
+    const [split, setSplit] = useState(false)
+    const [rows, setRows] = useState([{ method: 'CASH', amount: '' }, { method: 'UPI', amount: '' }])
+    const [redeem, setRedeem] = useState('')
     const clear = useCartStore((s) => s.clear)
     const qc = useQueryClient()
     const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: () => api.get('/api/customers') })
+    const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: () => api.get('/api/settings') })
 
-    const recv = received === '' ? (method === 'CREDIT' ? 0 : totals.total) : Number(received)
-    const paid = Math.min(recv, totals.total)
-    const due = totals.total - paid
-    const change = method === 'CASH' ? Math.max(0, recv - totals.total) : 0
+    const customer = customers.find((c) => c.id === customerId)
+    const maxPts = customer?.points || 0
+    const redeemPts = Math.min(Number(redeem) || 0, maxPts)
+    const finalTotal = Math.max(0, totals.total - redeemPts)
+
+    const recv = received === '' ? (method === 'CREDIT' ? 0 : finalTotal) : Number(received)
+    const paid = split ? rows.reduce((s, r) => s + (Number(r.amount) || 0), 0) : Math.min(recv, finalTotal)
+    const due = finalTotal - paid
+    const change = !split && method === 'CASH' ? Math.max(0, recv - finalTotal) : 0
 
     const confirm = async () => {
-        if (due > 0 && !customerId) {
-            toast.error('Udhaar/partial-ku customer select pannanum! 👤')
-            return
-        }
-        const { items, table, orderType } = useCartStore.getState()
+        if (due > 0 && !customerId) { toast.error('Udhaar/partial-ku customer select pannanum! 👤'); return }
+        if (split && Math.abs(paid - finalTotal) > 0.5) { toast.error(`Split total ${inr(paid)} ≠ ${inr(finalTotal)}!`); return }
+        const { items, table, orderType, itemDiscount, serviceCharge } = useCartStore.getState()
         try {
-            await api.post('/api/invoices', { items, orderType, table, method, totals, paid, customerId: customerId || null })
-            if (orderType === 'DINE_IN' && items.length)
-                if (orderType === 'DINE_IN' && items.length) {
-                    await api.post('/api/kots', {
-                        table: table || '—',
-                        items: items.map((i) => ({ name: i.name, qty: i.qty })),
-                    })
-                }
+            await api.post('/api/invoices', {
+                items: items.map((i) => ({
+                    id: i.id, name: i.name, qty: i.qty, price: i.unitPrice,
+                    variantName: i.variant?.name || null,
+                    modifiers: i.modifiers.map((m) => m.name).join(', ') || null,
+                })),
+                orderType, table,
+                method,
+                payments: split ? rows.map((r) => ({ method: r.method, amount: Number(r.amount) || 0 })) : [{ method, amount: paid }],
+                paid,
+                customerId: customerId || null,
+                redeemPoints: redeemPts,
+                discountPct: itemDiscount,
+                servicePct: serviceCharge,
+                taxPct: settings?.taxPct || 0,
+            })
+            if (orderType === 'DINE_IN' && items.length) {
+                await api.post('/api/kots', { table: table || '—', items: items.map((i) => ({ name: i.name, qty: i.qty })) })
+            }
             qc.invalidateQueries({ queryKey: ['products'] })
             qc.invalidateQueries({ queryKey: ['invoices'] })
             qc.invalidateQueries({ queryKey: ['customers'] })
-            toast.success(due > 0 ? `Saved · Due ${inr(due)} 📒` : `Invoice saved · ${inr(totals.total)} ✅`)
-            clear(); setReceived(''); setCustomerId(''); onClose()
+            toast.success(due > 0 ? `Saved · Due ${inr(due)} 📒` : `Invoice saved · ${inr(finalTotal)} ✅`)
+            clear(); setReceived(''); setCustomerId(''); setRedeem('')
+            onClose()
         } catch (e) {
             console.error(e)
             toast.error('Invoice save failed ❌')
@@ -56,9 +76,10 @@ export default function PaymentModal({ open, onClose, totals }) {
 
     return (
         <Modal open={open} onClose={onClose} title="💳 Payment">
-            <p className="text-center text-3xl font-extrabold text-primary mb-4">{inr(totals.total)}</p>
+            <p className="text-center text-3xl font-extrabold text-primary mb-1">{inr(finalTotal)}</p>
+            {redeemPts > 0 && <p className="text-center text-xs font-bold text-emerald-400 mb-2">⭐ {redeemPts} points redeemed</p>}
 
-            <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="grid grid-cols-4 gap-2 mb-3">
                 {METHODS.map(({ id, label, icon: Icon }) => (
                     <button key={id} onClick={() => setMethod(id)}
                         className={cn('rounded-xl border p-2.5 flex flex-col items-center gap-1 text-[11px] font-bold transition',
@@ -69,29 +90,64 @@ export default function PaymentModal({ open, onClose, totals }) {
             </div>
 
             <div className="space-y-2">
-                <label className="text-[11px] font-bold text-mut">Amount received ₹
-                    <input type="number" value={received} onChange={(e) => setReceived(e.target.value)}
-                        placeholder={method === 'CREDIT' ? '0 (full udhaar)' : String(totals.total)}
-                        className="mt-1 w-full rounded-lg bg-bg border border-line px-3 py-2.5 text-sm outline-none focus:border-primary" />
-                </label>
-                <div className="flex gap-2">
-                    {[totals.total, 500, 1000, 2000].map((v, i) => (
-                        <button key={i} onClick={() => setReceived(String(v))}
-                            className="flex-1 rounded-lg bg-card border border-line py-1.5 text-xs font-bold hover:border-primary">
-                            {v === totals.total ? 'Exact' : `₹${v}`}
-                        </button>
-                    ))}
-                </div>
+                {!split && (
+                    <>
+                        <input type="number" value={received} onChange={(e) => setReceived(e.target.value)}
+                            placeholder={method === 'CREDIT' ? '0 (full udhaar)' : String(finalTotal)}
+                            className="w-full rounded-lg bg-bg border border-line px-3 py-2.5 text-sm outline-none focus:border-primary" />
+                        <div className="flex gap-2">
+                            {[finalTotal, 500, 1000, 2000].map((v, i) => (
+                                <button key={i} onClick={() => setReceived(String(v))}
+                                    className="flex-1 rounded-lg bg-card border border-line py-1.5 text-xs font-bold hover:border-primary">
+                                    {v === finalTotal ? 'Exact' : `₹${v}`}
+                                </button>
+                            ))}
+                        </div>
+                        {change > 0 && <p className="text-sm font-bold text-emerald-400">Change: {inr(change)}</p>}
+                    </>
+                )}
 
-                {change > 0 && <p className="text-sm font-bold text-emerald-400">Change: {inr(change)}</p>}
+                {split && (
+                    <div className="space-y-1.5">
+                        {rows.map((r, i) => (
+                            <div key={i} className="flex gap-2">
+                                <select value={r.method} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, method: e.target.value } : x)))}
+                                    className="rounded-lg bg-bg border border-line px-2 py-2 text-xs font-bold outline-none">
+                                    {['CASH', 'UPI', 'CARD'].map((m) => <option key={m}>{m}</option>)}
+                                </select>
+                                <Input type="number" placeholder="Amount" value={r.amount}
+                                    onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+                                <button onClick={() => setRows(rows.filter((_, j) => j !== i))} className="text-mut hover:text-rose-400"><X size={14} /></button>
+                            </div>
+                        ))}
+                        <button onClick={() => setRows([...rows, { method: 'CASH', amount: '' }])}
+                            className="text-[11px] font-bold text-primary hover:underline"><Plus size={12} className="inline" /> Add payment row</button>
+                        <p className={cn('text-xs font-bold', Math.abs(paid - finalTotal) < 0.5 ? 'text-emerald-400' : 'text-rose-400')}>
+                            Split total: {inr(paid)} / {inr(finalTotal)}
+                        </p>
+                    </div>
+                )}
+
+                <label className="flex items-center gap-2 text-xs font-bold text-mut">
+                    <input type="checkbox" checked={split} onChange={(e) => setSplit(e.target.checked)} />
+                    💳 Split payment (multiple methods)
+                </label>
+
                 {due > 0 && (
                     <div className="space-y-1">
                         <p className="text-sm font-bold text-rose-400">Due (udhaar): {inr(due)}</p>
                         <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}
                             className="w-full rounded-lg bg-bg border border-line px-3 py-2.5 text-sm outline-none">
                             <option value="">👤 Select customer… *</option>
-                            {customers.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.phone}</option>)}
+                            {customers.map((c) => <option key={c.id} value={c.id}>{c.name} · ⭐{c.points}</option>)}
                         </select>
+                    </div>
+                )}
+
+                {customer && settings?.loyaltyEnabled && maxPts > 0 && due === 0 && (
+                    <div>
+                        <p className="text-xs font-bold text-mut mb-1">⭐ {customer.name} has {maxPts} points (1 pt = ₹1)</p>
+                        <Input type="number" placeholder="Redeem points" value={redeem} onChange={(e) => setRedeem(e.target.value)} />
                     </div>
                 )}
             </div>
