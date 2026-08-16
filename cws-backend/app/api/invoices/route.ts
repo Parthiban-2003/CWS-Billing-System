@@ -15,6 +15,8 @@ const clean = (inv: any) => ({
   paid: Number(inv.paid),
   redeemed: inv.redeemed ?? 0,
   pointsEarned: inv.pointsEarned ?? 0,
+  pointsBefore: inv.pointsBefore ?? 0,
+  pointsAfter: inv.pointsAfter ?? 0,
   items: inv.items?.map((i: any) => ({
     ...i,
     price: Number(i.price),
@@ -24,13 +26,16 @@ const clean = (inv: any) => ({
     ...p,
     amount: Number(p.amount),
   })),
-  customer: inv.customer ? {
-    id: inv.customer.id,
-    name: inv.customer.name,
-    phone: inv.customer.phone,
-    points: inv.customer.points ?? 0,
-    totalSpent: Number(inv.customer.totalSpent || 0),
-  } : null,
+  customer: inv.customer
+    ? {
+      id: inv.customer.id,
+      name: inv.customer.name,
+      phone: inv.customer.phone,
+      gstin: inv.customer.gstin,
+      points: inv.customer.points ?? 0,
+      totalSpent: Number(inv.customer.totalSpent || 0),
+    }
+    : null,
 })
 
 export async function GET() {
@@ -77,21 +82,26 @@ export async function POST(req: Request) {
     const roundOff = Math.round(gross) - gross
     let total = Math.round(gross)
 
+    // 👤 Customer fetch (points balance-ku)
+    let cust: any = null
+    if (body.customerId) {
+      cust = await prisma.customer.findUnique({ where: { id: body.customerId } })
+    }
+    const pointsBefore = cust?.points ?? 0
+
     // ⭐ Loyalty redeem (1 point = ₹1)
     let redeemPts = 0
-    if (body.customerId && num(body.redeemPoints) > 0 && settings?.loyaltyEnabled) {
-      const cust = await prisma.customer.findUnique({
-        where: { id: body.customerId },
-      })
-      redeemPts = Math.min(num(body.redeemPoints), cust?.points || 0)
+    if (cust && num(body.redeemPoints) > 0 && settings?.loyaltyEnabled) {
+      redeemPts = Math.min(num(body.redeemPoints), pointsBefore)
       total = Math.max(0, total - redeemPts)
     }
 
-    // ⭐ Loyalty earn compute (snapshot value save pannanum)
+    // ⭐ Loyalty earn (₹100 = 1 point)
     const earned =
-      body.customerId && settings?.loyaltyEnabled
-        ? Math.floor((num(body.paid) || total) / 100)
-        : 0
+      cust && settings?.loyaltyEnabled ? Math.floor(total / 100) : 0
+
+    // ⭐ Final balance snapshot
+    const pointsAfter = pointsBefore + earned - redeemPts
 
     // 💳 Split payments support
     const payments =
@@ -123,6 +133,8 @@ export async function POST(req: Request) {
         customerId: body.customerId ?? null,
         redeemed: redeemPts,
         pointsEarned: earned,
+        pointsBefore,
+        pointsAfter,
         payments: {
           create: payments.map((p: any) => ({
             method: p.method || 'CASH',
@@ -144,10 +156,10 @@ export async function POST(req: Request) {
       include: { items: true, payments: true, customer: true },
     })
 
-    // ⭐ Loyalty earn — customer-ula update
-    if (body.customerId && settings?.loyaltyEnabled) {
+    // ⭐ Customer points update
+    if (cust && settings?.loyaltyEnabled) {
       await prisma.customer.update({
-        where: { id: body.customerId },
+        where: { id: cust.id },
         data: {
           points: { increment: earned - redeemPts },
           totalSpent: { increment: paid },
@@ -155,7 +167,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // 📦 Stock decrement (real products mattum — combos skip)
+    // 📦 Stock decrement (combos skip)
     for (const i of items) {
       if (i.id && !i.isCombo) {
         await prisma.product
