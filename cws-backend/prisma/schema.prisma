@@ -15,11 +15,13 @@ model Tenant {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   products  Product[]
+  invoices  Invoice[]
 }
 
 model Product {
   id         String   @id @default(uuid())
   tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
   name       String
   category   String?
   barcode    String?
@@ -29,8 +31,77 @@ model Product {
   lowStockAt Decimal  @default(5) @db.Decimal(12, 3)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, barcode])
   @@index([tenantId, name])
+}
+
+model Invoice {
+  id        String        @id @default(uuid())
+  tenantId  String
+  number    Int
+  table     String?
+  orderType String
+  method    String
+  subtotal  Decimal       @db.Decimal(10, 2)
+  discount  Decimal       @default(0) @db.Decimal(10, 2)
+  service   Decimal       @default(0) @db.Decimal(10, 2)
+  roundOff  Decimal       @default(0) @db.Decimal(10, 2)
+  total     Decimal       @db.Decimal(10, 2)
+  status    String        @default("PAID")
+  createdAt DateTime      @default(now())
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  items     InvoiceItem[]
+    paid       Decimal   @default(0) @db.Decimal(10, 2)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  payments   Payment[]
+
+  @@index([tenantId, createdAt])
+}
+
+model InvoiceItem {
+  id        String  @id @default(uuid())
+  invoiceId String
+  productId String?
+  name      String
+  qty       Int
+  price     Decimal @db.Decimal(10, 2)
+  amount    Decimal @db.Decimal(10, 2)
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Customer {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String
+  phone     String?
+  gstin     String?
+  createdAt DateTime  @default(now())
+  invoices  Invoice[]
+
+  @@index([tenantId, name])
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  invoiceId String
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String
+  createdAt DateTime @default(now())
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+
+model Expense {
+  id        String   @id @default(uuid())
+  tenantId  String
+  category  String
+  note      String?
+  party     String?
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String   @default("CASH")
+  date      DateTime @default(now())
+
+  @@index([tenantId, date])
 }
