@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Invoice" ADD COLUMN     "pointsAfter" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "pointsBefore" INTEGER NOT NULL DEFAULT 0;
