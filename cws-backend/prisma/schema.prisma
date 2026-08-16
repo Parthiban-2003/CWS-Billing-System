@@ -8,7 +8,7 @@ datasource db {
 }
 
 // ─────────────────────────────────────────────
-// TENANT (Multi-tenant root)
+// TENANT
 // ─────────────────────────────────────────────
 model Tenant {
   id        String   @id @default(uuid())
@@ -22,46 +22,58 @@ model Tenant {
   invoices Invoice[]
   tables   RestTable[]
   kots     Kot[]
+  combos   Combo[]
   settings TenantSetting?
 }
 
 // ─────────────────────────────────────────────
-// TENANT SETTINGS (Branding + Tax + Invoice)
+// TENANT SETTINGS
 // ─────────────────────────────────────────────
 model TenantSetting {
-  id            String  @id @default(uuid())
-  tenantId      String  @unique
-  companyName   String  @default("CWS Smart Billing")
-  logo          String?
-  gstin         String?
-  address       String?
-  phone         String?
-  footerMsg     String  @default("Thank you! Visit again")
-  taxPct        Decimal @default(0) @db.Decimal(5, 2)
-  servicePct    Decimal @default(0) @db.Decimal(5, 2)
-  invoicePrefix String  @default("INV")
-  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id             String  @id @default(uuid())
+  tenantId       String  @unique
+  companyName    String  @default("CWS Smart Billing")
+  logo           String?
+  gstin          String?
+  address        String?
+  phone          String?
+  footerMsg      String  @default("Thank you! Visit again")
+  taxPct         Decimal @default(0) @db.Decimal(5, 2)
+  servicePct     Decimal @default(0) @db.Decimal(5, 2)
+  invoicePrefix  String  @default("INV")
+  happyStart     String?
+  happyEnd       String?
+  happyPct       Decimal @default(0) @db.Decimal(5, 2)
+  loyaltyEnabled Boolean @default(true)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 // ─────────────────────────────────────────────
-// PRODUCTS + VARIANTS
+// PRODUCTS
 // ─────────────────────────────────────────────
 model Product {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   tenantId    String
-  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
   name        String
   category    String?
   barcode     String?
-  kind        String    @default("PRODUCT")
-  price       Decimal   @default(0) @db.Decimal(10, 2)
-  stock       Decimal   @default(0) @db.Decimal(12, 3)
-  lowStockAt  Decimal   @default(5) @db.Decimal(12, 3)
-  isAvailable Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  kind        String   @default("PRODUCT")
 
-  variants Variant[]
+  price       Decimal  @default(0) @db.Decimal(10, 2)
+  stock       Decimal  @default(0) @db.Decimal(12, 3)
+  lowStockAt  Decimal  @default(5) @db.Decimal(12, 3)
+
+  isAvailable Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants   Variant[]
+  modifiers  Modifier[]
+  comboItems ComboItem[]
 
   @@unique([tenantId, barcode])
   @@index([tenantId, name])
@@ -72,19 +84,31 @@ model Variant {
   productId String
   name      String
   delta     Decimal @default(0) @db.Decimal(10, 2)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Modifier {
+  id        String  @id @default(uuid())
+  productId String
+  name      String
+  delta     Decimal @default(0) @db.Decimal(10, 2)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 // ─────────────────────────────────────────────
 // CUSTOMERS
 // ─────────────────────────────────────────────
 model Customer {
-  id        String    @id @default(uuid())
-  tenantId  String
-  name      String
-  phone     String?
-  gstin     String?
-  createdAt DateTime  @default(now())
+  id         String   @id @default(uuid())
+  tenantId   String
+  name       String
+  phone      String?
+  gstin      String?
+  points     Int      @default(0)
+  totalSpent Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
 
   invoices Invoice[]
 
@@ -92,24 +116,28 @@ model Customer {
 }
 
 // ─────────────────────────────────────────────
-// INVOICES + ITEMS + PAYMENTS
+// INVOICES (with loyalty snapshot)
 // ─────────────────────────────────────────────
 model Invoice {
-  id         String    @id @default(uuid())
-  tenantId   String
-  number     Int
-  table      String?
-  orderType  String
-  method     String
-  subtotal   Decimal   @db.Decimal(10, 2)
-  discount   Decimal   @default(0) @db.Decimal(10, 2)
-  service    Decimal   @default(0) @db.Decimal(10, 2)
-  roundOff   Decimal   @default(0) @db.Decimal(10, 2)
-  total      Decimal   @db.Decimal(10, 2)
-  paid       Decimal   @default(0) @db.Decimal(10, 2)
-  status     String    @default("PAID")
-  customerId String?
-  createdAt  DateTime  @default(now())
+  id           String   @id @default(uuid())
+  tenantId     String
+  number       Int
+  table        String?
+  orderType    String
+  method       String
+
+  subtotal     Decimal  @db.Decimal(10, 2)
+  discount     Decimal  @default(0) @db.Decimal(10, 2)
+  service      Decimal  @default(0) @db.Decimal(10, 2)
+  roundOff     Decimal  @default(0) @db.Decimal(10, 2)
+  total        Decimal  @db.Decimal(10, 2)
+  paid         Decimal  @default(0) @db.Decimal(10, 2)
+
+  status       String   @default("PAID")
+  customerId   String?
+  redeemed     Int      @default(0)
+  pointsEarned Int      @default(0)
+  createdAt    DateTime @default(now())
 
   tenant   Tenant        @relation(fields: [tenantId], references: [id])
   customer Customer?     @relation(fields: [customerId], references: [id])
@@ -120,13 +148,16 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id        String  @id @default(uuid())
-  invoiceId String
-  productId String?
-  name      String
-  qty       Int
-  price     Decimal @db.Decimal(10, 2)
-  amount    Decimal @db.Decimal(10, 2)
+  id          String  @id @default(uuid())
+  invoiceId   String
+  productId   String?
+
+  name        String
+  qty         Int
+  price       Decimal @db.Decimal(10, 2)
+  amount      Decimal @db.Decimal(10, 2)
+  variantName String?
+  modifiers   String?
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
@@ -141,9 +172,6 @@ model Payment {
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
-// ─────────────────────────────────────────────
-// EXPENSES
-// ─────────────────────────────────────────────
 model Expense {
   id       String   @id @default(uuid())
   tenantId String
@@ -157,9 +185,6 @@ model Expense {
   @@index([tenantId, date])
 }
 
-// ─────────────────────────────────────────────
-// RESTAURANT — TABLES + KOT (Kitchen Order Ticket)
-// ─────────────────────────────────────────────
 model RestTable {
   id       String   @id @default(uuid())
   tenantId String
@@ -174,12 +199,12 @@ model RestTable {
 }
 
 model Kot {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   tenantId  String
   number    Int
   table     String
-  status    String    @default("NEW")
-  createdAt DateTime  @default(now())
+  status    String   @default("NEW")
+  createdAt DateTime @default(now())
 
   tenant Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items  KotItem[]
@@ -194,4 +219,29 @@ model KotItem {
   qty   Int
 
   kot Kot @relation(fields: [kotId], references: [id], onDelete: Cascade)
+}
+
+model Combo {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  price     Decimal  @db.Decimal(10, 2)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  ComboItem[]
+}
+
+model ComboItem {
+  id        String @id @default(uuid())
+  comboId   String
+  productId String
+  qty       Int    @default(1)
+
+  combo   Combo   @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([comboId])
+  @@index([productId])
 }
