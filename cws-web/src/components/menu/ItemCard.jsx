@@ -4,18 +4,20 @@ import { Trash2, Pencil } from 'lucide-react'
 import { api } from '@/lib/api'
 import Card from '@/components/ui/Card'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
-import { useMenuStore } from '@/stores/useMenuStore'
 import { inr, cn } from '@/lib/utils'
 
-const VARIANTS = { Biryani: ['Small', 'Medium', 'Large'], Beverages: ['Regular', 'Large'] }
-
-export default function ItemCard({ p, onDeleted }) {
-    const { unavailable, toggle } = useMenuStore()
+export default function ItemCard({ p, onDeleted, onEdit }) {
     const [delOpen, setDelOpen] = useState(false)
-    const isOff = unavailable.includes(p.id)
+    const available = p.isAvailable !== false
+
+    const toggle86 = async () => {
+        await api.patch(`/api/products/${p.id}`, { isAvailable: !available })
+        toast.success(!available ? `${p.name} available ✅` : `${p.name} marked 86 🚫`)
+        onDeleted() // refresh
+    }
 
     return (
-        <Card className={cn('p-4 space-y-2 transition', isOff && 'opacity-50')}>
+        <Card className={cn('p-4 space-y-2 transition', !available && 'opacity-50')}>
             <div className="flex justify-between items-start">
                 <div>
                     <p className="font-extrabold">{p.name}</p>
@@ -24,22 +26,25 @@ export default function ItemCard({ p, onDeleted }) {
                 <div className="flex gap-2">
                     <button onClick={onEdit} className="text-mut hover:text-primary"><Pencil size={15} /></button>
                     <button onClick={() => setDelOpen(true)} className="text-mut hover:text-rose-400"><Trash2 size={15} /></button>
-                </div>            </div>
+                </div>
+            </div>
 
-            {VARIANTS[p.category] && (
-                <div className="flex gap-1.5">
-                    {VARIANTS[p.category].map((v) => (
-                        <span key={v} className="text-[10px] font-bold bg-primary-soft text-primary rounded-full px-2 py-0.5">{v}</span>
+            {p.variants?.length > 0 && (
+                <div className="flex gap-1.5 flex-wrap">
+                    {p.variants.map((v) => (
+                        <span key={v.id} className="text-[10px] font-bold bg-primary-soft text-primary rounded-full px-2 py-0.5">
+                            {v.name} {inr(p.price + Number(v.delta))}
+                        </span>
                     ))}
                 </div>
             )}
 
             <div className="flex justify-between items-center pt-1">
                 <span className="text-primary font-extrabold">{inr(p.price)}</span>
-                <button onClick={() => { toggle(p.id); toast(isOff ? `${p.name} available ✅` : `${p.name} marked 86 (unavailable) 🚫`) }}
+                <button onClick={toggle86}
                     className={cn('text-[10px] font-extrabold rounded-full px-2.5 py-1',
-                        isOff ? 'bg-rose-500/15 text-rose-400' : 'bg-emerald-500/15 text-emerald-400')}>
-                    {isOff ? '86 · OFF' : 'AVAILABLE'}
+                        available ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400')}>
+                    {available ? 'AVAILABLE' : '86 · OFF'}
                 </button>
             </div>
 

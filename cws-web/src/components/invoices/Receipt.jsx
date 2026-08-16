@@ -1,9 +1,10 @@
-import { useSettingsStore } from '@/stores/useSettingsStore'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
 import { inr } from '@/lib/utils'
 import { RECEIPT_CSS } from '@/lib/receiptCss'
 
 export default function Receipt({ inv }) {
-    const { companyName, logo } = useSettingsStore()
+    const { data: s } = useQuery({ queryKey: ['settings'], queryFn: () => api.get('/api/settings') })
     const d = new Date(inv.createdAt)
 
     return (
@@ -11,15 +12,19 @@ export default function Receipt({ inv }) {
             <style>{RECEIPT_CSS}</style>
 
             <div className="rc-head">
-                {logo && <img src={logo} alt="logo" className="rc-logo" />}
-                <div className="rc-name">{companyName}</div>
-                <div className="rc-sub">GSTIN: 33ABCDE1234F1Z5 · Ph: 98765 43210<br />12, Main Road, Chennai</div>
+                {s?.logo && <img src={s.logo} alt="logo" className="rc-logo" />}
+                <div className="rc-name">{s?.companyName || 'Business'}</div>
+                <div className="rc-sub">
+                    {s?.gstin && `GSTIN: ${s.gstin} · `}
+                    {s?.phone && `Ph: ${s.phone}`}
+                    {s?.address && <><br />{s.address}</>}
+                </div>
                 <span className="rc-badge">{inv.status}</span>
             </div>
 
             <hr className="rc-div" />
 
-            <div className="rc-meta"><b>Invoice #{inv.number}</b><span>{d.toLocaleDateString('en-IN')}</span></div>
+            <div className="rc-meta"><b>{s?.invoicePrefix || 'INV'} #{inv.number}</b><span>{d.toLocaleDateString('en-IN')}</span></div>
             <div className="rc-meta rc-mut">
                 <span>{inv.orderType === 'DINE_IN' ? `Dine-in · Table ${inv.table || '—'}` : 'Takeaway'}</span>
                 <span>{inv.method}</span>
@@ -32,9 +37,7 @@ export default function Receipt({ inv }) {
             <hr className="rc-div" />
 
             <table className="rc-table">
-                <thead>
-                    <tr><th>Item</th><th className="c">Qty</th><th className="r">Amount</th></tr>
-                </thead>
+                <thead><tr><th>Item</th><th className="c">Qty</th><th className="r">Amount</th></tr></thead>
                 <tbody>
                     {inv.items.map((i) => (
                         <tr key={i.id}><td>{i.name}</td><td className="c">{i.qty}</td><td className="r">{inr(i.amount)}</td></tr>
@@ -51,7 +54,7 @@ export default function Receipt({ inv }) {
             <div className="rc-total"><span>GRAND TOTAL</span><span>{inr(inv.total)}</span></div>
 
             <div className="rc-foot">
-                <div className="rc-thanks">Thank you! Visit again 🙏</div>
+                <div className="rc-thanks">{s?.footerMsg || 'Thank you! 🙏'}</div>
                 <div className="rc-powered">Powered by CWS Smart Billing</div>
             </div>
         </div>

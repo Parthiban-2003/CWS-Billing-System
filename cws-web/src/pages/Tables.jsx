@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Monitor, ChefHat } from 'lucide-react'
-import { useTablesStore } from '@/stores/useTablesStore'
-import { useNow } from '@/hooks/useNow'
+import { ChefHat, Monitor } from 'lucide-react'
+import { api } from '@/lib/api'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
+import { useNow } from '@/hooks/useNow'
+import { useCartStore } from '@/stores/useCartStore'
 import { cn } from '@/lib/utils'
 
 const STYLES = {
@@ -16,12 +18,23 @@ const STYLES = {
 }
 
 export default function Tables() {
-    const { tables, setStatus } = useTablesStore()
+    const { data: tables = [], isError } = useQuery({ queryKey: ['tables'], queryFn: () => api.get('/api/tables') })
+    const qc = useQueryClient()
     const now = useNow()
     const [sel, setSel] = useState(null)
     const nav = useNavigate()
 
-    const act = (status, msg) => { setStatus(sel.id, status); toast(msg); setSel(null) }
+    const act = async (status, msg) => {
+        await api.patch(`/api/tables/${sel.id}`, { status })
+        toast(msg)
+        qc.invalidateQueries({ queryKey: ['tables'] })
+        setSel(null)
+    }
+
+    const openOrder = (t) => {
+        useCartStore.getState().setMeta({ table: t.name, orderType: 'DINE_IN' })
+        nav('/app/pos')
+    }
 
     return (
         <div className="space-y-4">
@@ -33,30 +46,36 @@ export default function Tables() {
                 </div>
             </div>
 
+            {isError && (
+                <p className="text-rose-400 text-sm font-bold">❌ /api/tables fail — backend terminal paaru!</p>
+            )}
+
             <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
                 {tables.map((t) => (
                     <button key={t.id} onClick={() => setSel(t)}
                         className={cn('rounded-xl border-2 p-4 text-center transition hover:scale-105 active:scale-95', STYLES[t.status])}>
-                        <p className="text-lg font-extrabold">{t.id}</p>
+                        <p className="text-lg font-extrabold">{t.name}</p>
                         <p className="text-[10px] font-bold mt-1">{t.status}</p>
-                        {t.status === 'OCCUPIED' && <p className="text-[10px] mt-0.5 opacity-80">{Math.floor((now - t.since) / 60000)} min</p>}
+                        {t.status === 'OCCUPIED' && (
+                            <p className="text-[10px] mt-0.5 opacity-80">{Math.floor((now - new Date(t.since)) / 60000)} min</p>
+                        )}
                     </button>
                 ))}
             </div>
 
-            <Modal open={!!sel} onClose={() => setSel(null)} title={`🪑 Table ${sel?.id}`}>
+            {tables.length === 0 && !isError && (
+                <p className="text-mut text-center py-16">No tables — `pnpm exec prisma db seed` run pannu 🌱</p>
+            )}
+
+            <Modal open={!!sel} onClose={() => setSel(null)} title={`🪑 Table ${sel?.name}`}>
                 <div className="grid grid-cols-2 gap-2">
-                    {sel?.status !== 'OCCUPIED' && <Button onClick={() => act('OCCUPIED', `Table ${sel.id} occupied 🍽`)}>Seat Customer</Button>}
-                    {sel?.status === 'OCCUPIED' && <Button onClick={() => { useCartStoreSet(sel.id); nav('/app/pos') }}>Open Order →</Button>}
-                    {sel?.status !== 'RESERVED' && <Button variant="soft" onClick={() => act('RESERVED', `Table ${sel.id} reserved 📅`)}>Reserve</Button>}
-                    {sel?.status !== 'CLEANING' && <Button variant="soft" onClick={() => act('CLEANING', `Table ${sel.id} cleaning 🧽`)}>Cleaning</Button>}
-                    {sel?.status !== 'FREE' && <Button variant="ghost" onClick={() => act('FREE', `Table ${sel.id} free ✅`)}>Mark Free</Button>}
+                    {sel?.status !== 'OCCUPIED' && <Button onClick={() => act('OCCUPIED', `Table ${sel.name} occupied 🍽`)}>Seat Customer</Button>}
+                    {sel?.status === 'OCCUPIED' && <Button onClick={() => openOrder(sel)}>Open Order →</Button>}
+                    {sel?.status !== 'RESERVED' && <Button variant="soft" onClick={() => act('RESERVED', `Table ${sel.name} reserved 📅`)}>Reserve</Button>}
+                    {sel?.status !== 'CLEANING' && <Button variant="soft" onClick={() => act('CLEANING', `Table ${sel.name} cleaning 🧽`)}>Cleaning</Button>}
+                    {sel?.status !== 'FREE' && <Button variant="ghost" onClick={() => act('FREE', `Table ${sel.name} free ✅`)}>Mark Free</Button>}
                 </div>
             </Modal>
         </div>
     )
-}
-
-function useCartStoreSet(tableId) {
-    import('@/stores/useCartStore').then((m) => m.useCartStore.getState().setMeta({ table: tableId, orderType: 'DINE_IN' }))
 }

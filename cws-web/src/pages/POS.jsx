@@ -11,9 +11,11 @@ export default function POS() {
     const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: () => api.get('/api/products') })
 
     const cats = ['All', ...new Set(products.map((p) => p.category).filter(Boolean))]
-    const list = products.filter((p) =>
-        (cat === 'All' || p.category === cat) && p.name.toLowerCase().includes(search.toLowerCase())
-    )
+    const list = products
+        .filter((p) => p.isAvailable !== false)
+        .filter((p) =>
+            (cat === 'All' || p.category === cat) && p.name.toLowerCase().includes(search.toLowerCase())
+        )
 
     return (
         <div className="grid lg:grid-cols-[1fr_380px] gap-4">

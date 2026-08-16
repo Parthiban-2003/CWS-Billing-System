@@ -1,11 +1,13 @@
+import { useQuery } from '@tanstack/react-query'
 import { useCartStore } from '@/stores/useCartStore'
+import { api } from '@/lib/api'
 import Input from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 
-const TABLES = Array.from({ length: 12 }, (_, i) => `T${i + 1}`)
-
 export default function OrderBar({ search, setSearch, cats, cat, setCat }) {
     const { orderType, table, setMeta } = useCartStore()
+    const { data: tables = [] } = useQuery({ queryKey: ['tables'], queryFn: () => api.get('/api/tables') })
+
     return (
         <div className="space-y-2">
             <div className="flex flex-wrap gap-2 items-center">
@@ -21,7 +23,7 @@ export default function OrderBar({ search, setSearch, cats, cat, setCat }) {
                     <select value={table} onChange={(e) => setMeta({ table: e.target.value })}
                         className="rounded-lg bg-card border border-line px-3 py-2 text-xs font-bold outline-none">
                         <option value="">Select table…</option>
-                        {TABLES.map((t) => <option key={t}>{t}</option>)}
+                        {tables.map((t) => <option key={t.id} value={t.name}>{t.name} · {t.status}</option>)}
                     </select>
                 )}
                 <Input placeholder="🔍 Search / scan barcode…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />

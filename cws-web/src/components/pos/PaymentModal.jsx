@@ -5,7 +5,6 @@ import { Banknote, QrCode, CreditCard, BookMinus } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import { useCartStore } from '@/stores/useCartStore'
-import { useKotStore } from '@/stores/useKotStore'
 import { api } from '@/lib/api'
 import { inr, cn } from '@/lib/utils'
 
@@ -37,7 +36,13 @@ export default function PaymentModal({ open, onClose, totals }) {
         const { items, table, orderType } = useCartStore.getState()
         try {
             await api.post('/api/invoices', { items, orderType, table, method, totals, paid, customerId: customerId || null })
-            if (orderType === 'DINE_IN' && items.length) useKotStore.getState().addKot(items, table || '—')
+            if (orderType === 'DINE_IN' && items.length)
+                if (orderType === 'DINE_IN' && items.length) {
+                    await api.post('/api/kots', {
+                        table: table || '—',
+                        items: items.map((i) => ({ name: i.name, qty: i.qty })),
+                    })
+                }
             qc.invalidateQueries({ queryKey: ['products'] })
             qc.invalidateQueries({ queryKey: ['invoices'] })
             qc.invalidateQueries({ queryKey: ['customers'] })

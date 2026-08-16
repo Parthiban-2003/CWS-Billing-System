@@ -1,4 +1,5 @@
-import { useKotStore } from '@/stores/useKotStore'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/lib/api'
 import { useNow } from '@/hooks/useNow'
 import { cn } from '@/lib/utils'
 
@@ -10,8 +11,18 @@ const COLS = [
 ]
 
 export default function Kitchen() {
-    const { kots, move } = useKotStore()
+    const { data: kots = [] } = useQuery({
+        queryKey: ['kots'],
+        queryFn: () => api.get('/api/kots'),
+        refetchInterval: 5000, // live feel 🔥
+    })
+    const qc = useQueryClient()
     const now = useNow(10000)
+
+    const move = async (id, status) => {
+        await api.patch(`/api/kots/${id}`, { status })
+        qc.invalidateQueries({ queryKey: ['kots'] })
+    }
 
     return (
         <div className="min-h-screen bg-bg text-ink p-4">
@@ -25,12 +36,12 @@ export default function Kitchen() {
                     <div key={c.id} className="bg-card border border-line rounded-xl p-3 space-y-2 min-h-[70vh]">
                         <p className="font-extrabold text-sm text-mut">{c.label} ({kots.filter((k) => k.status === c.id).length})</p>
                         {kots.filter((k) => k.status === c.id).map((k) => {
-                            const wait = Math.floor((now - k.at) / 60000)
+                            const wait = Math.floor((now - new Date(k.createdAt)) / 60000)
                             return (
                                 <div key={k.id} className={cn('rounded-lg border-2 p-3 space-y-1',
                                     wait < 5 ? 'border-emerald-500/40' : wait < 10 ? 'border-amber-500/50' : 'border-rose-500/60 animate-pulse')}>
                                     <div className="flex justify-between font-extrabold text-sm">
-                                        <span>#{k.id} · {k.table}</span><span>{wait}m</span>
+                                        <span>#{k.number} · {k.table}</span><span>{wait}m</span>
                                     </div>
                                     {k.items.map((i) => (
                                         <p key={i.id} className="text-sm"><b className="text-primary">{i.qty}×</b> {i.name}</p>
