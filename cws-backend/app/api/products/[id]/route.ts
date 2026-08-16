@@ -1,28 +1,15 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { productSchema } from '@/lib/schemas/product'
+import { update, remove, productSchema } from '@modules/products'
 
-export async function DELETE(
-    _req: Request,
-    { params }: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
-    await prisma.product.delete({ where: { id } })
-    return NextResponse.json({ ok: true })
+    const p = productSchema.partial().safeParse(await req.json())
+    if (!p.success) return NextResponse.json({ error: p.error.issues }, { status: 400 })
+    return NextResponse.json(await update(id, p.data))
 }
 
-export async function PATCH(
-    req: Request,
-    { params }: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
-    const parsed = productSchema.safeParse(await req.json())
-    if (!parsed.success) {
-        return NextResponse.json({ error: parsed.error.issues }, { status: 400 })
-    }
-    const product = await prisma.product.update({
-        where: { id },
-        data: parsed.data,
-    })
-    return NextResponse.json(product)
+    await remove(id)
+    return NextResponse.json({ ok: true })
 }

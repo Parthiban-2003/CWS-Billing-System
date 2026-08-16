@@ -14,11 +14,11 @@ import Customers from '@/pages/Customers'
 import Reports from '@/pages/Reports'
 import Expenses from '@/pages/Expenses'
 
-
 export const router = createBrowserRouter([
     { path: '/', element: <Navigate to="/app" replace /> },
     {
-        path: '/app', element: <AppLayout />,
+        path: '/app',
+        element: <AppLayout />,
         children: [
             { index: true, element: <Dashboard /> },
             { path: 'pos', element: <POS /> },
@@ -32,4 +32,6 @@ export const router = createBrowserRouter([
             { path: 'settings', element: <Settings /> },
         ],
     },
+    { path: '/kitchen', element: <Kitchen /> },
+    { path: '/waiter', element: <Waiter /> },
 ])
