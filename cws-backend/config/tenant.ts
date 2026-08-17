@@ -1,0 +1,1 @@
+export const DEV_TENANT_ID = 'demo-tenant-0001'
