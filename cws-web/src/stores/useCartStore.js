@@ -11,19 +11,36 @@ export const useCartStore = create(
             serviceCharge: 0,
             held: [],
 
-            add: (p) => set((s) => {
-                const ex = s.items.find((i) => i.id === p.id)
-                return { items: ex ? s.items.map((i) => (i.id === p.id ? { ...i, qty: i.qty + 1 } : i)) : [...s.items, { id: p.id, name: p.name, price: Number(p.price), qty: 1 }] }
+            add: (p, opts = {}) => set((s) => {
+                const unitPrice =
+                    Number(p.price) +
+                    Number(opts.variant?.delta || 0) +
+                    (opts.modifiers || []).reduce((sum, m) => sum + Number(m.delta || m.price || 0), 0)
+                const key = `${p.id}|${opts.variant?.id || ''}|${(opts.modifiers || []).map((m) => m.id).join(',')}`
+                const ex = s.items.find((i) => i.key === key)
+                if (ex) return { items: s.items.map((i) => (i.key === key ? { ...i, qty: i.qty + 1 } : i)) }
+                return {
+                    items: [...s.items, {
+                        key, id: p.id, name: p.name, price: Number(p.price), unitPrice, qty: 1,
+                        variant: opts.variant || null,
+                        modifiers: opts.modifiers || [],
+                        isCombo: !!p.isCombo,
+                        comboItems: p.comboItems || [],
+                    }],
+                }
             }),
-            dec: (id) => set((s) => ({ items: s.items.map((i) => (i.id === id ? { ...i, qty: i.qty - 1 } : i)).filter((i) => i.qty > 0) })),
-            remove: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
+            dec: (key) => set((s) => ({ items: s.items.map((i) => (i.key === key ? { ...i, qty: i.qty - 1 } : i)).filter((i) => i.qty > 0) })),
+            remove: (key) => set((s) => ({ items: s.items.filter((i) => i.key !== key) })),
             clear: () => set({ items: [], itemDiscount: 0, serviceCharge: 0 }),
             setMeta: (patch) => set(patch),
 
             hold: () => {
                 const s = get()
                 if (!s.items.length) return
-                set({ held: [...s.held, { id: Date.now(), items: s.items, table: s.table, at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }], items: [], table: '' })
+                set({
+                    held: [...s.held, { id: Date.now(), items: s.items, table: s.table, at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }],
+                    items: [], table: '',
+                })
             },
             resume: (id) => {
                 const s = get()
