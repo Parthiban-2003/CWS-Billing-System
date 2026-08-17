@@ -55,7 +55,7 @@ export default function Receipt({ inv }) {
                 <span>Cashier: Admin</span>
             </div>
 
-            {/* 👤 CUSTOMER (if any) */}
+            {/* 👤 CUSTOMER DETAILS */}
             {inv.customer && (
                 <>
                     <hr className="rc-div" />
@@ -66,6 +66,7 @@ export default function Receipt({ inv }) {
                     {inv.customer.gstin && (
                         <div className="rc-meta rc-mut">
                             <span>GSTIN: {inv.customer.gstin}</span>
+                            <span></span>
                         </div>
                     )}
                 </>
@@ -87,7 +88,9 @@ export default function Receipt({ inv }) {
                         <tr key={i.id}>
                             <td>
                                 {i.name}
-                                {i.variantName && <span className="rc-mut"> — {i.variantName}</span>}
+                                {i.variantName && (
+                                    <span className="rc-mut"> — {i.variantName}</span>
+                                )}
                                 {i.modifiers && (
                                     <div className="rc-mut" style={{ fontSize: '10px' }}>
                                         + {i.modifiers}
@@ -143,15 +146,31 @@ export default function Receipt({ inv }) {
                 </>
             )}
 
-            {/* ⭐ LOYALTY SNAPSHOT */}
-            {(inv.pointsEarned > 0 || inv.redeemed > 0) && (
-                <div className="rc-row rc-mut" style={{ marginTop: 6, fontSize: 10 }}>
-                    <span>⭐ Loyalty</span>
-                    <span>
-                        {inv.redeemed > 0 && `−${inv.redeemed} redeemed `}
-                        {inv.pointsEarned > 0 && `+${inv.pointsEarned} earned`}
-                    </span>
-                </div>
+            {/* ⭐ LOYALTY FULL STATEMENT */}
+            {inv.customer && (
+                <>
+                    <hr className="rc-div" />
+                    <div className="rc-row rc-mut">
+                        <span>⭐ Previous balance</span>
+                        <span>{inv.pointsBefore ?? 0} pts</span>
+                    </div>
+                    {inv.pointsEarned > 0 && (
+                        <div className="rc-row rc-mut">
+                            <span>+ Earned this bill</span>
+                            <span>{inv.pointsEarned} pts</span>
+                        </div>
+                    )}
+                    {inv.redeemed > 0 && (
+                        <div className="rc-row rc-mut">
+                            <span>− Redeemed</span>
+                            <span>{inv.redeemed} pts</span>
+                        </div>
+                    )}
+                    <div className="rc-row" style={{ fontWeight: 800, color: '#0f172a' }}>
+                        <span>⭐ TOTAL POINTS NOW</span>
+                        <span>{inv.pointsAfter ?? 0} pts</span>
+                    </div>
+                </>
             )}
 
             {/* FOOTER */}
