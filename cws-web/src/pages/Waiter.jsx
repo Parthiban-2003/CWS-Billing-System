@@ -5,9 +5,15 @@ import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 
 export default function Waiter() {
-    const { data: kots = [] } = useQuery({ queryKey: ['kots'], queryFn: () => api.get('/api/kots'), refetchInterval: 5000 })
+    const { data: kots = [] } = useQuery({
+        queryKey: ['kots'],
+        queryFn: () => api.get('/api/kots'),
+        refetchInterval: 4000,
+    })
     const qc = useQueryClient()
+
     const ready = kots.filter((k) => k.status === 'READY')
+    const preparing = kots.filter((k) => k.status === 'PREPARING')
 
     const serve = async (k) => {
         await api.patch(`/api/kots/${k.id}`, { status: 'COMPLETED' })
@@ -18,16 +24,42 @@ export default function Waiter() {
     return (
         <div className="min-h-screen bg-bg text-ink p-4 max-w-xl mx-auto space-y-4">
             <h1 className="text-xl font-extrabold">🤵 Waiter — Ready to Serve</h1>
+
             {ready.map((k) => (
-                <Card key={k.id} className="p-4 flex items-center justify-between border-emerald-500/30">
+                <Card
+                    key={k.id}
+                    className="p-4 flex items-center justify-between border-emerald-500/40"
+                >
                     <div>
-                        <p className="font-extrabold">#{k.number} · Table {k.table}</p>
-                        <p className="text-xs text-mut">{k.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}</p>
+                        <p className="font-extrabold">🔔 #{k.number} · Table {k.table}</p>
+                        <p className="text-xs text-mut">
+                            {k.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}
+                        </p>
                     </div>
                     <Button onClick={() => serve(k)}>Served ✅</Button>
                 </Card>
             ))}
-            {ready.length === 0 && <p className="text-mut text-center py-16">No ready orders — kitchen-la check pannu 🍳</p>}
+            {ready.length === 0 && (
+                <p className="text-mut text-center py-10">
+                    No ready orders — kitchen-la prepare aagudhu 🍳
+                </p>
+            )}
+
+            {preparing.length > 0 && (
+                <>
+                    <p className="text-xs font-extrabold text-mut pt-2">
+                        ⏳ IN PROGRESS ({preparing.length})
+                    </p>
+                    {preparing.map((k) => (
+                        <Card key={k.id} className="p-3 flex justify-between items-center opacity-70">
+                            <p className="text-sm font-bold">#{k.number} · Table {k.table}</p>
+                            <span className="text-[10px] font-bold text-amber-400">
+                                PREPARING…
+                            </span>
+                        </Card>
+                    ))}
+                </>
+            )}
         </div>
     )
 }
