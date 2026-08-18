@@ -1,35 +1,58 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Languages, Bell } from 'lucide-react'
-import { useSettingsStore } from '@/stores/useSettingsStore'
+import { Bell, Languages } from 'lucide-react'
+import { api } from '@/lib/api'
 
 export default function Topbar() {
     const { i18n } = useTranslation()
-    const companyName = useSettingsStore((s) => s.companyName)
+    const [lang, setLang] = useState(i18n.language || 'en')
 
-    const switchLang = () => {
-        const next = i18n.language === 'en' ? 'ta' : 'en'
+    // ✅ DB branding
+    const { data: brand } = useQuery({
+        queryKey: ['settings'],
+        queryFn: () => api.get('/api/settings'),
+    })
+
+    const today = new Date().toLocaleDateString('en-IN', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+    })
+
+    const toggleLang = () => {
+        const next = lang === 'en' ? 'ta' : 'en'
         i18n.changeLanguage(next)
-        localStorage.setItem('lang', next)
+        setLang(next)
     }
 
     return (
-        <header className="h-16 flex items-center justify-between px-4 lg:px-6 bg-card/70 backdrop-blur border-b border-line sticky top-0 z-30">
+        <header className="flex items-center justify-between px-6 h-16 shrink-0 border-b border-line bg-card/60 backdrop-blur z-20">            {/* DATE + TITLE */}
             <div>
-                <p className="text-[11px] text-mut">
-                    {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-                <h1 className="font-extrabold text-sm lg:text-base truncate">{companyName}</h1>
+                <p className="text-[11px] text-mut font-bold">{today}</p>
+                <h1 className="font-extrabold text-lg truncate">
+                    {brand?.companyName || 'CWS Smart Billing System'}
+                </h1>
             </div>
-            <div className="flex items-center gap-2">
-                <button onClick={switchLang}
-                    className="flex items-center gap-1.5 rounded-full bg-primary-soft text-primary px-3 py-1.5 text-xs font-bold">
-                    <Languages size={14} /> {i18n.language === 'en' ? 'தமிழ்' : 'EN'}
+
+            {/* RIGHT ACTIONS */}
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={toggleLang}
+                    className="flex items-center gap-1.5 rounded-full bg-bg border border-line px-3 py-1.5 text-xs font-extrabold hover:border-primary"
+                >
+                    <Languages size={14} /> {lang.toUpperCase()}
                 </button>
-                <button className="relative rounded-full p-2 text-mut hover:text-ink hover:bg-primary-soft">
-                    <Bell size={17} />
-                    <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
+
+                <button className="relative text-mut hover:text-ink">
+                    <Bell size={18} />
+                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
                 </button>
-                <div className="h-8 w-8 rounded-full bg-primary text-bg grid place-items-center text-xs font-extrabold">A</div>
+
+                <div className="h-9 w-9 rounded-full bg-primary text-bg grid place-items-center font-extrabold">
+                    {(brand?.companyName || 'A')[0]}
+                </div>
             </div>
         </header>
     )

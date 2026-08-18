@@ -2,20 +2,22 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import MobileNav from './MobileNav'
-import { useUIStore } from '@/stores/useUIStore'
-import { cn } from '@/lib/utils'
 
 export default function AppLayout() {
-    const collapsed = useUIStore((s) => s.collapsed)
     return (
-        <div className="min-h-screen bg-bg text-ink">
+        <div className="flex h-screen overflow-hidden bg-bg text-ink">
+            {/* LEFT — SIDEBAR (fixed full height) */}
             <Sidebar />
-            <div className={cn('flex flex-col min-h-screen transition-all', collapsed ? 'lg:pl-20' : 'lg:pl-64')}>
+
+            {/* RIGHT — TOPBAR + CONTENT */}
+            <div className="flex-1 flex flex-col min-w-0">
                 <Topbar />
-                <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6">
+                <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">
                     <Outlet />
                 </main>
             </div>
+
+            {/* MOBILE BOTTOM NAV */}
             <MobileNav />
         </div>
     )
