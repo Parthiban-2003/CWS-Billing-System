@@ -1,14 +1,25 @@
-import { LayoutDashboard, ShoppingCart, Receipt, Package, UtensilsCrossed, Armchair, Users, BarChart3, Wallet, Settings } from 'lucide-react'
+import {
+    LayoutDashboard,
+    ShoppingCart,
+    Utensils,
+    Armchair,
+    ReceiptText,
+    Package,
+    Users,
+    BarChart3,
+    Wallet,
+    Settings,
+} from 'lucide-react'
 
 export const NAV = [
-    { to: '/app', key: 'dashboard', icon: LayoutDashboard, end: true },
-    { to: '/app/pos', key: 'pos', icon: ShoppingCart },
-    { to: '/app/menu', key: 'menu', icon: UtensilsCrossed },
-    { to: '/app/tables', key: 'tables', icon: Armchair },
-    { to: '/app/invoices', key: 'invoices', icon: Receipt },
-    { to: '/app/inventory', key: 'inventory', icon: Package },
-    { to: '/app/customers', key: 'customers', icon: Users },
-    { to: '/app/reports', key: 'reports', icon: BarChart3 },
-    { to: '/app/expenses', key: 'expenses', icon: Wallet },
-    { to: '/app/settings', key: 'settings', icon: Settings },
+    { path: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
+    { path: '/app/pos', label: 'POS', icon: ShoppingCart },
+    { path: '/app/menu', label: 'Menu', icon: Utensils },
+    { path: '/app/tables', label: 'Tables', icon: Armchair },
+    { path: '/app/invoices', label: 'Invoices', icon: ReceiptText },
+    { path: '/app/inventory', label: 'Inventory', icon: Package },
+    { path: '/app/customers', label: 'Customers', icon: Users },
+    { path: '/app/reports', label: 'Reports', icon: BarChart3 },
+    { path: '/app/expenses', label: 'Expenses', icon: Wallet },
+    { path: '/app/settings', label: 'Settings', icon: Settings },
 ]
