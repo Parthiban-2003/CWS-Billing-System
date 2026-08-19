@@ -85,7 +85,9 @@ export async function POST(req: Request) {
     // 👤 Customer fetch (points balance-ku)
     let cust: any = null
     if (body.customerId) {
-      cust = await prisma.customer.findUnique({ where: { id: body.customerId } })
+      cust = await prisma.customer.findUnique({
+        where: { id: body.customerId },
+      })
     }
     const pointsBefore = cust?.points ?? 0
 
@@ -167,13 +169,31 @@ export async function POST(req: Request) {
       })
     }
 
-    // 📦 Stock decrement (combos skip)
+    // 📦 Product stock decrement (combos skip)
     for (const i of items) {
       if (i.id && !i.isCombo) {
         await prisma.product
           .update({
             where: { id: i.id },
             data: { stock: { decrement: num(i.qty) } },
+          })
+          .catch(() => { })
+      }
+    }
+
+    // 🥬 Ingredient auto-decrement (recipe-based)
+    for (const i of items) {
+      if (!i.id || i.isCombo) continue
+      const recipe = await prisma.recipeItem.findMany({
+        where: { productId: i.id },
+      })
+      for (const r of recipe) {
+        await prisma.ingredient
+          .update({
+            where: { id: r.ingredientId },
+            data: {
+              stock: { decrement: Number(r.qty) * num(i.qty) },
+            },
           })
           .catch(() => { })
       }
