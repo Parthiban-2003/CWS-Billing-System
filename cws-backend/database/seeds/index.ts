@@ -6,6 +6,7 @@ import { seedExpenses } from './expenses.seed'
 import { seedTables } from './tables.seed'
 import { seedSettings } from './settings.seed'
 import { seedCombos } from './combos.seed'
+import { seedIngredients } from './ingredients.seed'
 
 async function main() {
     const tenant = await seedTenant()
@@ -15,6 +16,7 @@ async function main() {
     await seedTables(tenant.id)
     await seedSettings(tenant.id)
     await seedCombos(tenant.id)
+    await seedIngredients(tenant.id)
     console.log('🎉 ALL SEEDS COMPLETE!')
 }
 
