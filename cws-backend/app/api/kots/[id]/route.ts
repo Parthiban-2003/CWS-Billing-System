@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server'
-import { move, kotStatusSchema } from '@modules/kots'
+import { prisma } from '@/database/client'
+import { notify } from '@modules/notifications'
+
+const VALID = ['NEW', 'PREPARING', 'READY', 'COMPLETED']
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
-    const p = kotStatusSchema.safeParse(await req.json())
-    if (!p.success) return NextResponse.json({ error: p.error.issues }, { status: 400 })
-    return NextResponse.json(await move(id, p.data.status))
+    const body = await req.json()
+    if (!VALID.includes(body.status)) {
+        return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    }
+    const kot = await prisma.kot.update({
+        where: { id },
+        data: { status: body.status },
+        include: { items: true },
+    })
+    if (body.status === 'READY') {
+        await notify('ORDER_READY', `🔔 Order #${kot.number} ready · Table ${kot.table} — serve pannu!`)
+    }
+    return NextResponse.json(kot)
 }

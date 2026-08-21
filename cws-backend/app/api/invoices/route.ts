@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/database/client'
 import { DEV_TENANT_ID } from '@/config/tenant'
 import { isHappyHour } from '@/utils/happy'
+import { notify, notifyOnce } from '@modules/notifications'
 
 const num = (v: unknown) => Number(v) || 0
 
@@ -17,15 +18,8 @@ const clean = (inv: any) => ({
   pointsEarned: inv.pointsEarned ?? 0,
   pointsBefore: inv.pointsBefore ?? 0,
   pointsAfter: inv.pointsAfter ?? 0,
-  items: inv.items?.map((i: any) => ({
-    ...i,
-    price: Number(i.price),
-    amount: Number(i.amount),
-  })),
-  payments: inv.payments?.map((p: any) => ({
-    ...p,
-    amount: Number(p.amount),
-  })),
+  items: inv.items?.map((i: any) => ({ ...i, price: Number(i.price), amount: Number(i.amount) })),
+  payments: inv.payments?.map((p: any) => ({ ...p, amount: Number(p.amount) })),
   customer: inv.customer
     ? {
       id: inv.customer.id,
@@ -56,25 +50,17 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const settings = await prisma.tenantSetting.findUnique({
-      where: { tenantId: DEV_TENANT_ID },
-    })
+    const settings = await prisma.tenantSetting.findUnique({ where: { tenantId: DEV_TENANT_ID } })
 
     const happy =
       isHappyHour(settings?.happyStart, settings?.happyEnd) &&
       Number(settings?.happyPct || 0) > 0
 
     const items = Array.isArray(body.items) ? body.items : []
-    const subtotal = items.reduce(
-      (s: number, i: any) => s + num(i.price) * num(i.qty),
-      0
-    )
+    const subtotal = items.reduce((s: number, i: any) => s + num(i.price) * num(i.qty), 0)
 
-    // 💰 Server-side totals
     const manualDisc = subtotal * (num(body.discountPct) / 100)
-    const happyDisc = happy
-      ? (subtotal - manualDisc) * (Number(settings?.happyPct || 0) / 100)
-      : 0
+    const happyDisc = happy ? (subtotal - manualDisc) * (Number(settings?.happyPct || 0) / 100) : 0
     const discount = manualDisc + happyDisc
     const service = (subtotal - discount) * (num(body.servicePct) / 100)
     const tax = (subtotal - discount + service) * (num(body.taxPct) / 100)
@@ -82,30 +68,21 @@ export async function POST(req: Request) {
     const roundOff = Math.round(gross) - gross
     let total = Math.round(gross)
 
-    // 👤 Customer fetch (points balance-ku)
     let cust: any = null
     if (body.customerId) {
-      cust = await prisma.customer.findUnique({
-        where: { id: body.customerId },
-      })
+      cust = await prisma.customer.findUnique({ where: { id: body.customerId } })
     }
     const pointsBefore = cust?.points ?? 0
 
-    // ⭐ Loyalty redeem (1 point = ₹1)
     let redeemPts = 0
     if (cust && num(body.redeemPoints) > 0 && settings?.loyaltyEnabled) {
       redeemPts = Math.min(num(body.redeemPoints), pointsBefore)
       total = Math.max(0, total - redeemPts)
     }
 
-    // ⭐ Loyalty earn (₹100 = 1 point)
-    const earned =
-      cust && settings?.loyaltyEnabled ? Math.floor(total / 100) : 0
-
-    // ⭐ Final balance snapshot
+    const earned = cust && settings?.loyaltyEnabled ? Math.floor(total / 100) : 0
     const pointsAfter = pointsBefore + earned - redeemPts
 
-    // 💳 Split payments support
     const payments =
       Array.isArray(body.payments) && body.payments.length
         ? body.payments
@@ -114,9 +91,7 @@ export async function POST(req: Request) {
     const status = paid >= total ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID'
     const method = payments.length > 1 ? 'SPLIT' : payments[0].method
 
-    const count = await prisma.invoice.count({
-      where: { tenantId: DEV_TENANT_ID },
-    })
+    const count = await prisma.invoice.count({ where: { tenantId: DEV_TENANT_ID } })
 
     const invoice = await prisma.invoice.create({
       data: {
@@ -137,12 +112,7 @@ export async function POST(req: Request) {
         pointsEarned: earned,
         pointsBefore,
         pointsAfter,
-        payments: {
-          create: payments.map((p: any) => ({
-            method: p.method || 'CASH',
-            amount: num(p.amount),
-          })),
-        },
+        payments: { create: payments.map((p: any) => ({ method: p.method || 'CASH', amount: num(p.amount) })) },
         items: {
           create: items.map((i: any) => ({
             productId: i.id || null,
@@ -158,45 +128,57 @@ export async function POST(req: Request) {
       include: { items: true, payments: true, customer: true },
     })
 
-    // ⭐ Customer points update
     if (cust && settings?.loyaltyEnabled) {
       await prisma.customer.update({
         where: { id: cust.id },
-        data: {
-          points: { increment: earned - redeemPts },
-          totalSpent: { increment: paid },
-        },
+        data: { points: { increment: earned - redeemPts }, totalSpent: { increment: paid } },
       })
     }
 
-    // 📦 Product stock decrement (combos skip)
+    // 📦 Product stock decrement + ⚠️ low stock alert
     for (const i of items) {
       if (i.id && !i.isCombo) {
         await prisma.product
-          .update({
-            where: { id: i.id },
-            data: { stock: { decrement: num(i.qty) } },
-          })
+          .update({ where: { id: i.id }, data: { stock: { decrement: num(i.qty) } } })
           .catch(() => { })
+        const p = await prisma.product.findUnique({ where: { id: i.id } }).catch(() => null)
+        if (p && Number(p.stock) <= Number(p.lowStockAt)) {
+          await notifyOnce(
+            'LOW_STOCK',
+            `⚠️ ${p.name} low stock: ${Number(p.stock)} left (min ${Number(p.lowStockAt)})`,
+            Number(p.stock) <= 0 ? 'CRITICAL' : 'WARNING',
+            `product-${p.id}`
+          )
+        }
       }
     }
 
-    // 🥬 Ingredient auto-decrement (recipe-based)
+    // 🥬 Ingredient decrement + ⚠️ low stock alert
     for (const i of items) {
       if (!i.id || i.isCombo) continue
-      const recipe = await prisma.recipeItem.findMany({
-        where: { productId: i.id },
-      })
+      const recipe = await prisma.recipeItem.findMany({ where: { productId: i.id } })
       for (const r of recipe) {
         await prisma.ingredient
           .update({
             where: { id: r.ingredientId },
-            data: {
-              stock: { decrement: Number(r.qty) * num(i.qty) },
-            },
+            data: { stock: { decrement: Number(r.qty) * num(i.qty) } },
           })
           .catch(() => { })
+        const ing = await prisma.ingredient.findUnique({ where: { id: r.ingredientId } }).catch(() => null)
+        if (ing && Number(ing.stock) <= Number(ing.lowStockAt)) {
+          await notifyOnce(
+            'LOW_STOCK',
+            `⚠️ ${ing.name} low: ${Number(ing.stock)}${ing.unit} left (min ${Number(ing.lowStockAt)})`,
+            Number(ing.stock) <= 0 ? 'CRITICAL' : 'WARNING',
+            `ing-${ing.id}`
+          )
+        }
       }
+    }
+
+    // 💵 Big bill alert
+    if (total >= 2000) {
+      await notify('BIG_BILL', `💵 Big bill #${invoice.number}: ₹${total} (${body.orderType})`)
     }
 
     return NextResponse.json(clean(invoice), { status: 201 })
