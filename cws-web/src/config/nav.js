@@ -9,6 +9,7 @@ import {
     BarChart3,
     Wallet,
     Settings,
+    TrendingUp,
 } from 'lucide-react'
 
 export const NAV = [
@@ -20,6 +21,7 @@ export const NAV = [
     { path: '/app/inventory', label: 'Inventory', icon: Package },
     { path: '/app/customers', label: 'Customers', icon: Users },
     { path: '/app/reports', label: 'Reports', icon: BarChart3 },
+    { path: '/app/profit-loss', label: 'Profit & Loss', icon: TrendingUp },
     { path: '/app/expenses', label: 'Expenses', icon: Wallet },
     { path: '/app/settings', label: 'Settings', icon: Settings },
 ]
