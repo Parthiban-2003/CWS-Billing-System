@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Bell, Languages } from 'lucide-react'
+import { Languages } from 'lucide-react'
 import { api } from '@/lib/api'
+import NotificationBell from './NotificationBell'
 
 export default function Topbar() {
     const { i18n } = useTranslation()
     const [lang, setLang] = useState(i18n.language || 'en')
 
-    // ✅ DB branding
     const { data: brand } = useQuery({
         queryKey: ['settings'],
         queryFn: () => api.get('/api/settings'),
@@ -28,8 +28,9 @@ export default function Topbar() {
     }
 
     return (
-        <header className="flex items-center justify-between px-6 h-16 shrink-0 border-b border-line bg-card/60 backdrop-blur z-20">            {/* DATE + TITLE */}
-            <div>
+        <header className="flex items-center justify-between px-6 h-16 shrink-0 border-b border-line bg-card/60 backdrop-blur z-20">
+            {/* DATE + TITLE */}
+            <div className="min-w-0">
                 <p className="text-[11px] text-mut font-bold">{today}</p>
                 <h1 className="font-extrabold text-lg truncate">
                     {brand?.companyName || 'CWS Smart Billing System'}
@@ -45,10 +46,8 @@ export default function Topbar() {
                     <Languages size={14} /> {lang.toUpperCase()}
                 </button>
 
-                <button className="relative text-mut hover:text-ink">
-                    <Bell size={18} />
-                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
-                </button>
+                {/* 🔔 LIVE NOTIFICATION BELL (static illa!) */}
+                <NotificationBell />
 
                 <div className="h-9 w-9 rounded-full bg-primary text-bg grid place-items-center font-extrabold">
                     {(brand?.companyName || 'A')[0]}
