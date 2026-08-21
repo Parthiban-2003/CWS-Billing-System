@@ -25,6 +25,7 @@ model Tenant {
   combos      Combo[]
   ingredients Ingredient[]
   wastages    Wastage[]
+  notifications Notification[]
   settings    TenantSetting?
 }
 
@@ -304,4 +305,22 @@ model Wastage {
   product    Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, date])
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS (Alert center)
+// ─────────────────────────────────────────────
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  type      String   // NEW_ORDER | ORDER_READY | LOW_STOCK | WASTAGE | PAYMENT | BIG_BILL
+  message   String
+  priority  String   @default("INFO") // INFO | WARNING | CRITICAL
+  itemKey   String?  // dedup key (same item alert once/day)
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, read, createdAt])
 }
