@@ -24,6 +24,7 @@ model Tenant {
   kots        Kot[]
   combos      Combo[]
   ingredients Ingredient[]
+  reservations Reservation[]
   wastages    Wastage[]
   notifications Notification[]
   settings    TenantSetting?
@@ -82,6 +83,27 @@ model Product {
 
   @@unique([tenantId, barcode])
   @@index([tenantId, name])
+}
+
+// ─────────────────────────────────────────────
+// RESERVATIONS (Table booking)
+// ─────────────────────────────────────────────
+model Reservation {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  phone     String?
+  date      String   // YYYY-MM-DD (simple + safe)
+  time      String   // "19:00"
+  guests    Int      @default(2)
+  table     String?
+  note      String?
+  status    String   @default("BOOKED") // BOOKED | SEATED | COMPLETED | CANCELLED
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, date])
 }
 
 model Variant {
