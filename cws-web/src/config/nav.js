@@ -3,13 +3,14 @@ import {
     ShoppingCart,
     Utensils,
     Armchair,
+    CalendarDays,
     ReceiptText,
     Package,
     Users,
     BarChart3,
+    TrendingUp,
     Wallet,
     Settings,
-    TrendingUp,
 } from 'lucide-react'
 
 export const NAV = [
@@ -17,6 +18,7 @@ export const NAV = [
     { path: '/app/pos', label: 'POS', icon: ShoppingCart },
     { path: '/app/menu', label: 'Menu', icon: Utensils },
     { path: '/app/tables', label: 'Tables', icon: Armchair },
+    { path: '/app/reservations', label: 'Reservations', icon: CalendarDays },
     { path: '/app/invoices', label: 'Invoices', icon: ReceiptText },
     { path: '/app/inventory', label: 'Inventory', icon: Package },
     { path: '/app/customers', label: 'Customers', icon: Users },
