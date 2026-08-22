@@ -13,6 +13,8 @@ import Inventory from '@/pages/Inventory'
 import Customers from '@/pages/Customers'
 import Reports from '@/pages/Reports'
 import Expenses from '@/pages/Expenses'
+import ProfitLoss from '@/pages/ProfitLoss'
+
 
 export const router = createBrowserRouter([
     { path: '/', element: <Navigate to="/app" replace /> },
@@ -30,6 +32,7 @@ export const router = createBrowserRouter([
             { path: 'reports', element: <Reports /> },
             { path: 'expenses', element: <Expenses /> },
             { path: 'settings', element: <Settings /> },
+            { path: 'profit-loss', element: <ProfitLoss /> },
         ],
     },
     { path: '/kitchen', element: <Kitchen /> },
