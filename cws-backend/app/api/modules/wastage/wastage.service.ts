@@ -1,5 +1,6 @@
 import { prisma } from '@/database/client'
 import { DEV_TENANT_ID } from '@/config/tenant'
+import { notify } from '@modules/notifications'
 
 const num = (v: unknown) => Number(v) || 0
 
@@ -11,12 +12,14 @@ const clean = (w: any) => ({
 })
 
 export const list = async () =>
-    (await prisma.wastage.findMany({
-        where: { tenantId: DEV_TENANT_ID },
-        include: { ingredient: true, product: true },
-        orderBy: { date: 'desc' },
-        take: 100,
-    })).map(clean)
+    (
+        await prisma.wastage.findMany({
+            where: { tenantId: DEV_TENANT_ID },
+            include: { ingredient: true, product: true },
+            orderBy: { date: 'desc' },
+            take: 100,
+        })
+    ).map(clean)
 
 export const create = async (d: any) => {
     const w = await prisma.wastage.create({
@@ -32,7 +35,6 @@ export const create = async (d: any) => {
         include: { ingredient: true, product: true },
     })
 
-    // 📉 Stock auto-decrement
     if (d.itemType === 'INGREDIENT' && d.ingredientId) {
         await prisma.ingredient
             .update({ where: { id: d.ingredientId }, data: { stock: { decrement: num(d.qty) } } })
@@ -43,5 +45,10 @@ export const create = async (d: any) => {
             .update({ where: { id: d.productId }, data: { stock: { decrement: num(d.qty) } } })
             .catch(() => { })
     }
+
+    const itemName =
+        d.itemType === 'INGREDIENT' ? w.ingredient?.name || 'Ingredient' : w.product?.name || 'Product'
+    await notify('WASTAGE', `🗑️ ${itemName} ${num(d.qty)} wasted (${d.reason})`)
+
     return clean(w)
 }
