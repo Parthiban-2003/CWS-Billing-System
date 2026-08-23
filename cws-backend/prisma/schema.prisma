@@ -18,19 +18,20 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  staff Staff[]
-  attendance Attendance[]
-  payrolls Payroll[]
-  products    Product[]
-  invoices    Invoice[]
-  tables      RestTable[]
-  kots        Kot[]
-  combos      Combo[]
-  ingredients Ingredient[]
-  reservations Reservation[]
-  wastages    Wastage[]
+  staff         Staff[]
+  attendance    Attendance[]
+  payrolls      Payroll[]
+  products      Product[]
+  invoices      Invoice[]
+  tables        RestTable[]
+  kots          Kot[]
+  combos        Combo[]
+  ingredients   Ingredient[]
+  reservations  Reservation[]
+  wastages      Wastage[]
   notifications Notification[]
-  settings    TenantSetting?
+  settings      TenantSetting?
+  roles         Role[]
 }
 
 // ─────────────────────────────────────────────
@@ -53,7 +54,7 @@ model TenantSetting {
   happyPct       Decimal @default(0) @db.Decimal(5, 2)
   loyaltyEnabled Boolean @default(true)
 
-  whatsappEnabled Boolean  @default(false)
+  whatsappEnabled Boolean @default(false)
   whatsappApiKey  String?
   ownerPhone      String?
 
@@ -64,42 +65,128 @@ model TenantSetting {
 // STAFF (Employees + Roles + PIN)
 // ─────────────────────────────────────────────
 model Staff {
-  id        String   @id @default(uuid())
-  tenantId  String
-  name      String
-  phone     String?
-  role      String   @default("CASHIER") // OWNER | MANAGER | CASHIER | WAITER | KITCHEN
-  salary    Decimal  @default(0) @db.Decimal(10, 2)
-  payrollType String   @default("FIXED")
-  pin       String?  // 4-digit (login + attendance)
-  joinDate  DateTime @default(now())
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(uuid())
+  tenantId       String
+  name           String
+  roleId         String?
+  pinHash        String?
+  lastLoginAt    DateTime?
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  phone          String?
+  salary         Decimal   @default(0) @db.Decimal(10, 2)
+  payrollType    String    @default("FIXED")
+  pin            String?
+  joinDate       DateTime  @default(now())
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role   Role?  @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
   attendance Attendance[]
   payrolls   Payroll[]
+  sessions   Session[]
 
-  @@index([tenantId, role])
+  @@index([tenantId, roleId])
+}
+
+// ─────────────────────────────────────────────
+// ROLES (Dynamic role management)
+// ─────────────────────────────────────────────
+model Role {
+  id            String   @id @default(uuid())
+  tenantId      String
+  roleCode      String
+  roleName      String
+  roleNameTamil String?
+  description   String?
+  roleLevel     Int      @default(0)
+  isSystemRole  Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rolePermissions RolePermission[]
+  staff           Staff[]
+
+  @@unique([tenantId, roleCode])
+  @@index([tenantId])
+}
+
+// ─────────────────────────────────────────────
+// PERMISSIONS (Module + Action)
+// ─────────────────────────────────────────────
+model Permission {
+  id          String   @id @default(uuid())
+  module      String // "POS", "INVENTORY", "STAFF", "PAYROLL", etc.
+  action      String // "CREATE", "READ", "UPDATE", "DELETE"
+  code        String   @unique // "POS.CREATE"
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@unique([module, action])
+  @@index([module])
+}
+
+// ─────────────────────────────────────────────
+// ROLE PERMISSION MAPPING (Many-to-Many)
+// ─────────────────────────────────────────────
+model RolePermission {
+  id           String   @id @default(uuid())
+  roleId       String
+  permissionId String
+  isAllowed    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+}
+
+// ─────────────────────────────────────────────
+// SESSION (Refresh Tokens + Device Tracking)
+// ─────────────────────────────────────────────
+model Session {
+  id           String   @id @default(uuid())
+  staffId      String
+  refreshToken String   @unique
+  device       String? // "Chrome/Windows"
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  revoked      Boolean  @default(false)
+
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@index([refreshToken])
 }
 
 // ─────────────────────────────────────────────
 // PAYROLL (Monthly Salary Records)
 // ─────────────────────────────────────────────
 model Payroll {
-  id          String   @id @default(uuid())
-  tenantId    String
-  staffId     String
-  month       String   // "2026-08"
-  baseAmount  Decimal  @db.Decimal(10, 2)
-  additions   Decimal  @default(0) @db.Decimal(10, 2) // Bonus, Tips
-  deductions  Decimal  @default(0) @db.Decimal(10, 2) // Advance, Fines
-  netPay      Decimal  @db.Decimal(10, 2)
-  status      String   @default("DRAFT") // DRAFT | PAID
-  paidDate    DateTime?
-  note        String?
-  createdAt   DateTime @default(now())
+  id         String    @id @default(uuid())
+  tenantId   String
+  staffId    String
+  month      String // "2026-08"
+  baseAmount Decimal   @db.Decimal(10, 2)
+  additions  Decimal   @default(0) @db.Decimal(10, 2) // Bonus, Tips
+  deductions Decimal   @default(0) @db.Decimal(10, 2) // Advance, Fines
+  netPay     Decimal   @db.Decimal(10, 2)
+  status     String    @default("DRAFT") // DRAFT | PAID
+  paidDate   DateTime?
+  note       String?
+  createdAt  DateTime  @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -115,7 +202,7 @@ model Attendance {
   id        String    @id @default(uuid())
   tenantId  String
   staffId   String
-  date      String    // YYYY-MM-DD
+  date      String // YYYY-MM-DD
   checkIn   DateTime?
   checkOut  DateTime?
   status    String    @default("PRESENT") // PRESENT | LATE | LEAVE | ABSENT
@@ -169,8 +256,8 @@ model Reservation {
   tenantId  String
   name      String
   phone     String?
-  date      String   // YYYY-MM-DD (simple + safe)
-  time      String   // "19:00"
+  date      String // YYYY-MM-DD (simple + safe)
+  time      String // "19:00"
   guests    Int      @default(2)
   table     String?
   note      String?
@@ -411,10 +498,10 @@ model Wastage {
 model Notification {
   id        String   @id @default(uuid())
   tenantId  String
-  type      String   // NEW_ORDER | ORDER_READY | LOW_STOCK | WASTAGE | PAYMENT | BIG_BILL
+  type      String // NEW_ORDER | ORDER_READY | LOW_STOCK | WASTAGE | PAYMENT | BIG_BILL
   message   String
   priority  String   @default("INFO") // INFO | WARNING | CRITICAL
-  itemKey   String?  // dedup key (same item alert once/day)
+  itemKey   String? // dedup key (same item alert once/day)
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
