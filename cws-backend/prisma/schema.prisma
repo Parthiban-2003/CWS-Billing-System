@@ -19,6 +19,7 @@ model Tenant {
   updatedAt DateTime @updatedAt
 
   staff Staff[]
+  attendance Attendance[]
   products    Product[]
   invoices    Invoice[]
   tables      RestTable[]
@@ -71,8 +72,30 @@ model Staff {
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  attendance Attendance[]
 
   @@index([tenantId, role])
+}
+
+// ─────────────────────────────────────────────
+// ATTENDANCE (PIN punch = auto check-in)
+// ─────────────────────────────────────────────
+model Attendance {
+  id        String    @id @default(uuid())
+  tenantId  String
+  staffId   String
+  date      String    // YYYY-MM-DD
+  checkIn   DateTime?
+  checkOut  DateTime?
+  status    String    @default("PRESENT") // PRESENT | LATE | LEAVE | ABSENT
+  note      String?
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, date])
+  @@index([tenantId, date])
 }
 
 // ─────────────────────────────────────────────
