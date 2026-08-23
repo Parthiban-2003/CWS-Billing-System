@@ -7,6 +7,9 @@ import { seedTables } from './tables.seed'
 import { seedSettings } from './settings.seed'
 import { seedCombos } from './combos.seed'
 import { seedIngredients } from './ingredients.seed'
+import { seedStaff } from './staff.seed'
+import { seedPermissions } from './permissions.seed'
+import { seedRoles } from './roles.seed'
 
 async function main() {
     const tenant = await seedTenant()
@@ -17,6 +20,9 @@ async function main() {
     await seedSettings(tenant.id)
     await seedCombos(tenant.id)
     await seedIngredients(tenant.id)
+    await seedStaff(tenant.id)
+    await seedPermissions()
+    await seedRoles(tenant.id)
     console.log('🎉 ALL SEEDS COMPLETE!')
 }
 
