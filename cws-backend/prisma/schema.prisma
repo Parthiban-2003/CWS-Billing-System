@@ -53,6 +53,10 @@ model TenantSetting {
   happyPct       Decimal @default(0) @db.Decimal(5, 2)
   loyaltyEnabled Boolean @default(true)
 
+  whatsappEnabled Boolean  @default(false)
+  whatsappApiKey  String?
+  ownerPhone      String?
+
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
