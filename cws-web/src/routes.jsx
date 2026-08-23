@@ -14,6 +14,9 @@ import Customers from '@/pages/Customers'
 import Reports from '@/pages/Reports'
 import Expenses from '@/pages/Expenses'
 import ProfitLoss from '@/pages/ProfitLoss'
+import Reservations from '@/pages/Reservations'
+import Staff from '@/pages/Staff'
+import Attendance from '@/pages/Attendance'
 
 
 export const router = createBrowserRouter([
@@ -29,10 +32,13 @@ export const router = createBrowserRouter([
             { path: 'invoices', element: <Invoices /> },
             { path: 'inventory', element: <Inventory /> },
             { path: 'customers', element: <Customers /> },
+            { path: 'staff', element: <Staff /> },
             { path: 'reports', element: <Reports /> },
             { path: 'expenses', element: <Expenses /> },
             { path: 'settings', element: <Settings /> },
             { path: 'profit-loss', element: <ProfitLoss /> },
+            { path: 'reservations', element: <Reservations /> },
+            { path: 'attendance', element: <Attendance/> },
         ],
     },
     { path: '/kitchen', element: <Kitchen /> },
