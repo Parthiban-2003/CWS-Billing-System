@@ -20,6 +20,7 @@ model Tenant {
 
   staff Staff[]
   attendance Attendance[]
+  payrolls Payroll[]
   products    Product[]
   invoices    Invoice[]
   tables      RestTable[]
@@ -65,6 +66,7 @@ model Staff {
   phone     String?
   role      String   @default("CASHIER") // OWNER | MANAGER | CASHIER | WAITER | KITCHEN
   salary    Decimal  @default(0) @db.Decimal(10, 2)
+  payrollType String   @default("FIXED")
   pin       String?  // 4-digit (login + attendance)
   joinDate  DateTime @default(now())
   isActive  Boolean  @default(true)
@@ -73,8 +75,33 @@ model Staff {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   attendance Attendance[]
+  payrolls   Payroll[]
 
   @@index([tenantId, role])
+}
+
+// ─────────────────────────────────────────────
+// PAYROLL (Monthly Salary Records)
+// ─────────────────────────────────────────────
+model Payroll {
+  id          String   @id @default(uuid())
+  tenantId    String
+  staffId     String
+  month       String   // "2026-08"
+  baseAmount  Decimal  @db.Decimal(10, 2)
+  additions   Decimal  @default(0) @db.Decimal(10, 2) // Bonus, Tips
+  deductions  Decimal  @default(0) @db.Decimal(10, 2) // Advance, Fines
+  netPay      Decimal  @db.Decimal(10, 2)
+  status      String   @default("DRAFT") // DRAFT | PAID
+  paidDate    DateTime?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, month])
+  @@index([tenantId, month])
 }
 
 // ─────────────────────────────────────────────
