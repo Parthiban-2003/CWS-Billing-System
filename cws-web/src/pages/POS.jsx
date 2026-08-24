@@ -1,62 +1,124 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Plus, ShoppingCart, Trash2, Edit } from 'lucide-react'
 import { api } from '@/lib/api'
-import OrderBar from '@/components/pos/OrderBar'
-import ComboGrid from '@/components/pos/ComboGrid'
-import ProductGrid from '@/components/pos/ProductGrid'
-import CartPanel from '@/components/pos/CartPanel'
-import { useCartStore } from '@/stores/useCartStore'
+import { usePermissions } from '@/hooks/usePermissions'
+import Card from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
 
 export default function POS() {
+    // 🔐 USE PERMISSIONS HOOK (Like uploaded example)
+    const { canView, canCreate, canUpdate, canDelete, isOwner } = usePermissions()
+
+    const [cart, setCart] = useState([])
     const [search, setSearch] = useState('')
-    const [cat, setCat] = useState('All')
-    const add = useCartStore((s) => s.add)
-    const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: () => api.get('/api/products') })
-    const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => api.get('/api/invoices') })
 
-    const cats = ['All', ...new Set(products.map((p) => p.category).filter(Boolean))]
-    const list = products
-        .filter((p) => p.isAvailable !== false)
-        .filter((p) =>
-            (cat === 'All' || p.category === cat) && p.name.toLowerCase().includes(search.toLowerCase())
-        )
+    const { data: products = [], isLoading } = useQuery({
+        queryKey: ['products'],
+        queryFn: () => api.get('/api/products'),
+    })
 
-    // ⚡ Recent / best sellers (last 50 bills-la irundhu)
-    const recent = useMemo(() => {
-        const freq = {}
-        invoices.slice(0, 50).forEach((v) =>
-            (v.items || []).forEach((i) => { if (i.productId) freq[i.productId] = (freq[i.productId] || 0) + i.qty })
+    // 🔐 ACCESS DENIED CHECK (Like uploaded Events page)
+    if (!canView('POS')) {
+        return (
+            <div className="flex min-h-[400px] items-center justify-center">
+                <div className="text-center">
+                    <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <h2 className="text-xl font-semibold text-ink">Access Denied</h2>
+                    <p className="text-sm text-mut mt-2">
+                        You do not have permission to access POS.
+                    </p>
+                </div>
+            </div>
         )
-        return Object.entries(freq)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 6)
-            .map(([id]) => products.find((p) => p.id === id && p.isAvailable !== false))
-            .filter(Boolean)
-    }, [invoices, products])
+    }
+
+    const addToCart = (product) => {
+        // 🔐 PERMISSION CHECK BEFORE ACTION
+        if (!canCreate('POS')) {
+            toast.error('You cannot create bills ❌')
+            return
+        }
+        setCart([...cart, { ...product, qty: 1 }])
+    }
+
+    const removeFromCart = (index) => {
+        // 🔐 PERMISSION CHECK
+        if (!canUpdate('POS')) {
+            toast.error('You cannot modify bills ❌')
+            return
+        }
+        setCart(cart.filter((_, i) => i !== index))
+    }
+
+    const checkout = async () => {
+        if (!canCreate('POS')) {
+            toast.error('Permission denied ')
+            return
+        }
+        try {
+            await api.post('/api/invoices', { items: cart })
+            toast.success('Bill created! ✅')
+            setCart([])
+        } catch (e) {
+            toast.error('Failed to create bill ❌')
+        }
+    }
 
     return (
-        <div className="grid lg:grid-cols-[1fr_380px] gap-4">
-            <div className="space-y-4">
-                <OrderBar search={search} setSearch={setSearch} cats={cats} cat={cat} setCat={setCat} />
+        <div className="space-y-4">
+            {/* HEADER */}
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-extrabold">🛒 POS</h1>
 
-                {recent.length > 0 && (
-                    <div className="space-y-2">
-                        <p className="text-xs font-extrabold text-mut">⚡ QUICK PICK (frequent)</p>
-                        <div className="flex gap-2 overflow-x-auto pb-1">
-                            {recent.map((p) => (
-                                <button key={p.id} onClick={() => add(p)}
-                                    className="shrink-0 rounded-full bg-primary-soft text-primary border border-primary/30 px-3.5 py-2 text-xs font-extrabold hover:brightness-110 active:scale-95">
-                                    {p.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                {/* 🔐 CONDITIONAL RENDERING (Like uploaded example) */}
+                {canCreate('POS') && (
+                    <Button onClick={checkout} disabled={cart.length === 0}>
+                        <Plus size={16} className="inline mr-1" />
+                        Checkout
+                    </Button>
                 )}
-
-                <ComboGrid />
-                <ProductGrid products={list} />
             </div>
-            <CartPanel />
+
+            {/* PRODUCTS GRID */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {products.map((product) => (
+                    <Card
+                        key={product.id}
+                        className="p-4 cursor-pointer hover:border-primary transition"
+                        onClick={() => addToCart(product)}
+                    >
+                        <p className="font-bold truncate">{product.name}</p>
+                        <p className="text-sm text-mut">₹{product.price}</p>
+                    </Card>
+                ))}
+            </div>
+
+            {/* CART */}
+            <Card className="p-4">
+                <h3 className="font-bold mb-3">️ Cart ({cart.length})</h3>
+                <div className="space-y-2">
+                    {cart.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-bg rounded-lg">
+                            <span className="text-sm">{item.name} × {item.qty}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold">₹{item.price * item.qty}</span>
+
+                                {/* 🔐 CONDITIONAL DELETE BUTTON */}
+                                {canUpdate('POS') && (
+                                    <button
+                                        onClick={() => removeFromCart(index)}
+                                        className="text-rose-400 hover:bg-rose-500/10 p-1 rounded"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Card>
         </div>
     )
 }
