@@ -1,79 +1,157 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChefHat, Monitor } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { api } from '@/lib/api'
-import Modal from '@/components/ui/Modal'
-import Button from '@/components/ui/Button'
 import { useNow } from '@/hooks/useNow'
-import { useCartStore } from '@/stores/useCartStore'
+import Button from '@/components/ui/Button'
+import Card from '@/components/ui/Card'
+import Modal from '@/components/ui/Modal'
+import Input from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 
-const STYLES = {
-    FREE: 'border-emerald-500/30 text-emerald-400',
-    OCCUPIED: 'border-primary bg-primary-soft text-primary',
-    RESERVED: 'border-sky-500/40 text-sky-400',
-    CLEANING: 'border-amber-500/40 text-amber-400',
-}
-
 export default function Tables() {
-    const { data: tables = [], isError } = useQuery({ queryKey: ['tables'], queryFn: () => api.get('/api/tables') })
+    const [addOpen, setAddOpen] = useState(false)
+    const [f, setF] = useState({ name: '', seats: '4' })
     const qc = useQueryClient()
-    const now = useNow()
-    const [sel, setSel] = useState(null)
-    const nav = useNavigate()
+    const now = useNow(10000)
 
-    const act = async (status, msg) => {
-        await api.patch(`/api/tables/${sel.id}`, { status })
-        toast(msg)
+    // 🪑 LIVE TABLES
+    const { data: tables = [] } = useQuery({
+        queryKey: ['tables'],
+        queryFn: () => api.get('/api/tables'),
+        refetchInterval: 5000,
+    })
+
+    // 📅 RESERVATIONS (today badge-ku)
+    const { data: reservations = [] } = useQuery({
+        queryKey: ['reservations'],
+        queryFn: () => api.get('/api/reservations'),
+    })
+
+    const d = new Date()
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+    const resFor = (tableName) =>
+        reservations.find(
+            (r) => r.status === 'BOOKED' && r.table === tableName && r.date === today
+        )
+
+    const setStatus = async (t, status) => {
+        await api.patch(`/api/tables/${t.id}`, { status })
+        toast(status === 'OCCUPIED' ? `${t.name} seated 🪑` : `${t.name} freed ✅`)
         qc.invalidateQueries({ queryKey: ['tables'] })
-        setSel(null)
     }
 
-    const openOrder = (t) => {
-        useCartStore.getState().setMeta({ table: t.name, orderType: 'DINE_IN' })
-        nav('/app/pos')
+    const addTable = async () => {
+        await api.post('/api/tables', { name: f.name, seats: Number(f.seats) || 4 })
+        toast.success(`${f.name} added 🪑`)
+        qc.invalidateQueries({ queryKey: ['tables'] })
+        setAddOpen(false)
+        setF({ name: '', seats: '4' })
     }
+
+    const occupied = tables.filter((t) => t.status === 'OCCUPIED').length
 
     return (
         <div className="space-y-4">
+            {/* HEADER */}
             <div className="flex items-center justify-between flex-wrap gap-2">
-                <h1 className="text-2xl font-extrabold">🪑 Tables</h1>
-                <div className="flex gap-2">
-                    <a href="/kitchen" target="_blank"><Button variant="soft"><ChefHat size={15} className="inline mr-1" />Kitchen TV</Button></a>
-                    <a href="/waiter" target="_blank"><Button variant="ghost"><Monitor size={15} className="inline mr-1" />Waiter View</Button></a>
+                <div>
+                    <h1 className="text-2xl font-extrabold">🪑 Tables</h1>
+                    <p className="text-xs text-mut font-bold mt-0.5">
+                        {occupied}/{tables.length} occupied ·{' '}
+                        {reservations.filter((r) => r.date === today && r.status === 'BOOKED').length}{' '}
+                        bookings today
+                    </p>
                 </div>
+                <Button onClick={() => setAddOpen(true)}>
+                    <Plus size={16} className="inline mr-1" /> Add Table
+                </Button>
             </div>
 
-            {isError && (
-                <p className="text-rose-400 text-sm font-bold">❌ /api/tables fail — backend terminal paaru!</p>
-            )}
+            {/* TABLES GRID */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {tables.map((t) => {
+                    const busy = t.status === 'OCCUPIED'
+                    const res = resFor(t.name)
+                    const mins = busy
+                        ? Math.floor((now - new Date(t.since)) / 60000)
+                        : 0
 
-            <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
-                {tables.map((t) => (
-                    <button key={t.id} onClick={() => setSel(t)}
-                        className={cn('rounded-xl border-2 p-4 text-center transition hover:scale-105 active:scale-95', STYLES[t.status])}>
-                        <p className="text-lg font-extrabold">{t.name}</p>
-                        <p className="text-[10px] font-bold mt-1">{t.status}</p>
-                        {t.status === 'OCCUPIED' && (
-                            <p className="text-[10px] mt-0.5 opacity-80">{Math.floor((now - new Date(t.since)) / 60000)} min</p>
-                        )}
-                    </button>
-                ))}
+                    return (
+                        <Card
+                            key={t.id}
+                            className={cn(
+                                'p-4 space-y-2 border-2 transition',
+                                busy ? 'border-rose-500/40' : 'border-emerald-500/30'
+                            )}
+                        >
+                            {/* NAME + STATUS */}
+                            <div className="flex justify-between items-start">
+                                <p className="font-extrabold text-lg">{t.name}</p>
+                                <span
+                                    className={cn(
+                                        'text-[10px] font-extrabold rounded-full px-2 py-0.5',
+                                        busy
+                                            ? 'bg-rose-500/15 text-rose-400'
+                                            : 'bg-emerald-500/15 text-emerald-400'
+                                    )}
+                                >
+                                    {busy ? 'OCCUPIED' : 'FREE'}
+                                </span>
+                            </div>
+
+                            <p className="text-[11px] text-mut">👥 {t.seats} seats</p>
+
+                            {/* ⏱ OCCUPIED DURATION */}
+                            {busy && (
+                                <p className="text-[11px] font-bold text-rose-400">
+                                    ⏱ {mins} min
+                                </p>
+                            )}
+
+                            {/* 📅 RESERVATION BADGE (today) */}
+                            {res && (
+                                <p className="text-[10px] font-bold text-amber-400 bg-amber-500/10 rounded-md px-2 py-1">
+                                    📅 {res.time} · {res.name} ({res.guests})
+                                </p>
+                            )}
+
+                            {/* ACTION */}
+                            <Button
+                                variant={busy ? 'soft' : 'primary'}
+                                className="w-full"
+                                onClick={() => setStatus(t, busy ? 'FREE' : 'OCCUPIED')}
+                            >
+                                {busy ? 'Free Table ✅' : 'Seat Walk-in 🪑'}
+                            </Button>
+                        </Card>
+                    )
+                })}
             </div>
 
-            {tables.length === 0 && !isError && (
-                <p className="text-mut text-center py-16">No tables — `pnpm exec prisma db seed` run pannu 🌱</p>
+            {tables.length === 0 && (
+                <p className="text-mut text-center py-12">No tables — add pannu! 🪑</p>
             )}
 
-            <Modal open={!!sel} onClose={() => setSel(null)} title={`🪑 Table ${sel?.name}`}>
-                <div className="grid grid-cols-2 gap-2">
-                    {sel?.status !== 'OCCUPIED' && <Button onClick={() => act('OCCUPIED', `Table ${sel.name} occupied 🍽`)}>Seat Customer</Button>}
-                    {sel?.status === 'OCCUPIED' && <Button onClick={() => openOrder(sel)}>Open Order →</Button>}
-                    {sel?.status !== 'RESERVED' && <Button variant="soft" onClick={() => act('RESERVED', `Table ${sel.name} reserved 📅`)}>Reserve</Button>}
-                    {sel?.status !== 'CLEANING' && <Button variant="soft" onClick={() => act('CLEANING', `Table ${sel.name} cleaning 🧽`)}>Cleaning</Button>}
-                    {sel?.status !== 'FREE' && <Button variant="ghost" onClick={() => act('FREE', `Table ${sel.name} free ✅`)}>Mark Free</Button>}
+            {/* ADD TABLE MODAL */}
+            <Modal open={addOpen} onClose={() => setAddOpen(false)} title="🪑 Add Table">
+                <div className="space-y-3">
+                    <Input
+                        placeholder="Table name (T1, T2…)"
+                        value={f.name}
+                        onChange={(e) => setF({ ...f, name: e.target.value })}
+                    />
+                    <Input
+                        type="number"
+                        placeholder="Seats"
+                        value={f.seats}
+                        onChange={(e) => setF({ ...f, seats: e.target.value })}
+                    />
+                    <Button className="w-full" disabled={!f.name} onClick={addTable}>
+                        Add Table
+                    </Button>
                 </div>
             </Modal>
         </div>
