@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { MessageCircle } from 'lucide-react'
 import { api } from '@/lib/api'
 import Card from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import InvoiceDetail from '@/components/invoices/InvoiceDetail'
 import { inr, cn } from '@/lib/utils'
@@ -13,6 +13,7 @@ const METHOD_CLR = {
     CASH: 'text-emerald-400 bg-emerald-500/10',
     UPI: 'text-sky-400 bg-sky-500/10',
     CARD: 'text-purple-400 bg-purple-500/10',
+    SPLIT: 'text-amber-400 bg-amber-500/10',
 }
 
 export default function Invoices() {
@@ -32,7 +33,6 @@ export default function Invoices() {
         queryFn: () => api.get('/api/invoices'),
     })
 
-    // Always make sure invoices is an array
     const invoices = Array.isArray(invoicesData)
         ? invoicesData
         : Array.isArray(invoicesData?.data)
@@ -42,6 +42,25 @@ export default function Invoices() {
     const list = invoices.filter(
         (v) => filter === 'ALL' || v.status === filter
     )
+
+    // NEW: WhatsApp Handler
+    const sendWhatsApp = async (inv) => {
+        if (!inv.customer?.phone) {
+            toast.error('Customer phone number missing! ❌')
+            return
+        }
+        toast.loading('Sending WhatsApp...')
+        try {
+            const res = await api.post('/api/whatsapp/send', { invoiceId: inv.id })
+            if (res.success) {
+                toast.success(`Receipt sent to ${inv.customer.phone} 📱`)
+            } else {
+                toast.error(res.error || 'Failed to send ')
+            }
+        } catch (e) {
+            toast.error('Failed to send WhatsApp ❌')
+        }
+    }
 
     const doVoid = async () => {
         if (!voidId) return
@@ -80,13 +99,7 @@ export default function Invoices() {
                 </h1>
 
                 <div className="flex gap-2 flex-wrap">
-                    {[
-                        'ALL',
-                        'PAID',
-                        'PARTIAL',
-                        'UNPAID',
-                        'CANCELLED',
-                    ].map((f) => (
+                    {['ALL', 'PAID', 'PARTIAL', 'UNPAID', 'CANCELLED'].map((f) => (
                         <button
                             key={f}
                             onClick={() => setFilter(f)}
@@ -109,7 +122,6 @@ export default function Invoices() {
                     <p className="text-sm font-bold text-rose-400">
                         Failed to load invoices
                     </p>
-
                     <p className="text-xs text-mut mt-1">
                         {error?.message || 'Please try again.'}
                     </p>
@@ -121,33 +133,13 @@ export default function Invoices() {
                 <table className="w-full text-sm">
                     <thead className="bg-bg text-mut">
                         <tr>
-                            <th className="text-left px-4 py-3">
-                                #
-                            </th>
-
-                            <th className="text-left px-4 py-3">
-                                Time
-                            </th>
-
-                            <th className="text-left px-4 py-3">
-                                Type
-                            </th>
-
-                            <th className="text-left px-4 py-3">
-                                Method
-                            </th>
-
-                            <th className="text-right px-4 py-3">
-                                Total
-                            </th>
-
-                            <th className="text-right px-4 py-3">
-                                Status
-                            </th>
-
-                            <th className="text-right px-4 py-3">
-                                Actions
-                            </th>
+                            <th className="text-left px-4 py-3">#</th>
+                            <th className="text-left px-4 py-3">Time</th>
+                            <th className="text-left px-4 py-3">Type</th>
+                            <th className="text-left px-4 py-3">Method</th>
+                            <th className="text-right px-4 py-3">Total</th>
+                            <th className="text-right px-4 py-3">Status</th>
+                            <th className="text-right px-4 py-3">Actions</th>
                         </tr>
                     </thead>
 
@@ -155,10 +147,7 @@ export default function Invoices() {
                         {/* LOADING */}
                         {isLoading && (
                             <tr>
-                                <td
-                                    colSpan={7}
-                                    className="px-4 py-10 text-center text-mut"
-                                >
+                                <td colSpan={7} className="px-4 py-10 text-center text-mut">
                                     Loading invoices...
                                 </td>
                             </tr>
@@ -169,14 +158,8 @@ export default function Invoices() {
                             list.map((v) => {
                                 const total = Number(v.total) || 0
                                 const paid = Number(v.paid) || 0
-                                const due = Math.max(
-                                    total - paid,
-                                    0
-                                )
-
-                                const methodClass =
-                                    METHOD_CLR[v.method] ||
-                                    'text-mut bg-bg'
+                                const due = Math.max(total - paid, 0)
+                                const methodClass = METHOD_CLR[v.method] || 'text-mut bg-bg'
 
                                 return (
                                     <tr
@@ -192,35 +175,23 @@ export default function Invoices() {
                                         {/* TIME */}
                                         <td className="px-4 py-3 text-mut">
                                             {v.createdAt
-                                                ? new Date(
-                                                    v.createdAt
-                                                ).toLocaleTimeString(
-                                                    [],
-                                                    {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                    }
-                                                )
+                                                ? new Date(v.createdAt).toLocaleTimeString([], {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })
                                                 : '—'}
                                         </td>
 
                                         {/* ORDER TYPE */}
                                         <td className="px-4 py-3">
-                                            {v.orderType ===
-                                                'DINE_IN'
-                                                ? `🍽 ${v.table || '—'
-                                                }`
+                                            {v.orderType === 'DINE_IN'
+                                                ? `🍽 ${v.table || '—'}`
                                                 : '🥡 Takeaway'}
                                         </td>
 
                                         {/* PAYMENT METHOD */}
                                         <td className="px-4 py-3">
-                                            <span
-                                                className={cn(
-                                                    'rounded-full px-2 py-0.5 text-[10px] font-extrabold',
-                                                    methodClass
-                                                )}
-                                            >
+                                            <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-extrabold', methodClass)}>
                                                 {v.method || '—'}
                                             </span>
                                         </td>
@@ -235,76 +206,62 @@ export default function Invoices() {
                                             <span
                                                 className={cn(
                                                     'text-[10px] font-extrabold',
-                                                    v.status ===
-                                                        'PAID'
+                                                    v.status === 'PAID'
                                                         ? 'text-emerald-400'
-                                                        : v.status ===
-                                                            'PARTIAL'
+                                                        : v.status === 'PARTIAL'
                                                             ? 'text-amber-400'
-                                                            : v.status ===
-                                                                'UNPAID'
+                                                            : v.status === 'UNPAID'
                                                                 ? 'text-rose-400'
-                                                                : v.status ===
-                                                                    'CANCELLED'
+                                                                : v.status === 'CANCELLED'
                                                                     ? 'text-mut'
                                                                     : 'text-mut'
                                                 )}
                                             >
                                                 {v.status || 'UNKNOWN'}
-
-                                                {due > 0 &&
-                                                    v.status !==
-                                                    'CANCELLED' &&
-                                                    ` · due ${inr(due)}`}
+                                                {due > 0 && v.status !== 'CANCELLED' && ` · due ${inr(due)}`}
                                             </span>
                                         </td>
 
                                         {/* ACTIONS */}
-                                        <td
-                                            className="px-4 py-3 text-right"
-                                            onClick={(e) =>
-                                                e.stopPropagation()
-                                            }
-                                        >
-                                            {v.status === 'PAID' && (
+                                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex justify-end gap-2 items-center">
+                                                {/* 👇 NEW: WhatsApp Button */}
                                                 <button
-                                                    onClick={() =>
-                                                        setVoidId(
-                                                            v.id
-                                                        )
-                                                    }
-                                                    className="text-[11px] font-bold text-rose-400 hover:underline"
+                                                    onClick={() => sendWhatsApp(v)}
+                                                    className="h-7 w-7 rounded-md bg-bg border border-line text-green-500 hover:bg-green-500/10 grid place-items-center transition"
+                                                    title="Send WhatsApp Receipt"
                                                 >
-                                                    Void
+                                                    <MessageCircle size={14} />
                                                 </button>
-                                            )}
+
+                                                {v.status === 'PAID' && (
+                                                    <button
+                                                        onClick={() => setVoidId(v.id)}
+                                                        className="text-[11px] font-bold text-rose-400 hover:underline px-2"
+                                                    >
+                                                        Void
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 )
                             })}
 
                         {/* EMPTY */}
-                        {!isLoading &&
-                            list.length === 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={7}
-                                        className="px-4 py-10 text-center text-mut"
-                                    >
-                                        No invoices yet — POS-la
-                                        first bill adichu! ☝️
-                                    </td>
-                                </tr>
-                            )}
+                        {!isLoading && list.length === 0 && (
+                            <tr>
+                                <td colSpan={7} className="px-4 py-10 text-center text-mut">
+                                    No invoices yet — POS-la first bill adichu! ☝️
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </Card>
 
             {/* INVOICE DETAIL */}
-            <InvoiceDetail
-                inv={view}
-                onClose={() => setView(null)}
-            />
+            <InvoiceDetail inv={view} onClose={() => setView(null)} />
 
             {/* VOID CONFIRMATION */}
             <ConfirmDialog
