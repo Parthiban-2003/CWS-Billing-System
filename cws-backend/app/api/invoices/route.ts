@@ -3,6 +3,7 @@ import { prisma } from '@/database/client'
 import { DEV_TENANT_ID } from '@/config/tenant'
 import { isHappyHour } from '@/utils/happy'
 import { notify, notifyOnce } from '@modules/notifications'
+import { sendWhatsApp, formatBillReceipt } from '@modules/whatsapp' // 👈 NEW IMPORT
 
 const num = (v: unknown) => Number(v) || 0
 
@@ -179,6 +180,12 @@ export async function POST(req: Request) {
     // 💵 Big bill alert
     if (total >= 2000) {
       await notify('BIG_BILL', `💵 Big bill #${invoice.number}: ₹${total} (${body.orderType})`)
+    }
+
+    // 📱 AUTO WHATSAPP RECEIPT (If customer has phone)
+    if (invoice.customer?.phone) {
+      const msg = formatBillReceipt(invoice)
+      await sendWhatsApp(invoice.customer.phone, msg).catch(() => { })
     }
 
     return NextResponse.json(clean(invoice), { status: 201 })
