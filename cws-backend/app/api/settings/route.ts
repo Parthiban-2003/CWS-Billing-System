@@ -8,3 +8,7 @@ export async function GET() {
 export async function PUT(req: Request) {
     return NextResponse.json(await upsert(await req.json()))
 }
+
+export async function PATCH(req: Request) {
+    return NextResponse.json(await upsert(await req.json()))
+}
