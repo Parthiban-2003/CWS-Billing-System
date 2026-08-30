@@ -1,4 +1,7 @@
-export default function TabPanel({ children, value, index, ...other }) {
+"use client";
+import React from 'react';
+
+const TabPanel = ({ children, value, index, ...other }) => {
     return (
         <div
             role="tabpanel"
@@ -8,7 +11,9 @@ export default function TabPanel({ children, value, index, ...other }) {
             className={value === index ? 'block' : 'hidden'}
             {...other}
         >
-            <div className="p-4 sm:p-6">{children}</div>
+            <div className="p-6">{children}</div>
         </div>
-    )
-}
+    );
+};
+
+export default TabPanel;

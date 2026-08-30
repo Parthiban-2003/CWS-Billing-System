@@ -409,7 +409,7 @@ export default function PermissionAssignTab({
                                     >
                                         {modules.map((m) => (
                                             <option key={m} value={m}>
-                                                {m === 'ALL' ? '📋 All Modules' : m}
+                                                {m === 'ALL' ? ' All Modules' : m}
                                             </option>
                                         ))}
                                     </select>

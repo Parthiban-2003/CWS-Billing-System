@@ -1,212 +1,317 @@
-import { useState, useEffect } from 'react'
-import { Users, Shield, Key, RefreshCw } from 'lucide-react'
-import { toast } from 'sonner'
-import { api } from '@/lib/api'
-import Card from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
-import TabPanel from '@/components/userpermissions/TabPanel'
-import RoleCreationTab from '@/components/userpermissions/RoleCreationTab'
-import PermissionAssignTab from '@/components/userpermissions/PermissionAssignTab'
-import RolePermissionAssignedTab from '@/components/userpermissions/RolePermissionAssignedTab'
-import { cn } from '@/lib/utils'
+"use client";
+import React, { useState, useEffect } from "react";
+import { Users, Shield, Key, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
+import TabPanel from "@/components/userpermissions/TabPanel";
+import RoleCreationTab from "@/components/userpermissions/RoleCreationTab";
+import PermissionAssignTab from "@/components/userpermissions/PermissionAssignTab";
+import RolePermissionAssignedTab from "@/components/userpermissions/RolePermissionAssignedTab";
 
 export default function UserPermissionsPage() {
-    const [tabValue, setTabValue] = useState(0)
-    const [roles, setRoles] = useState([])
-    const [permissions, setPermissions] = useState([])
-    const [rolePermissions, setRolePermissions] = useState([])
-    const [selectedRoleForAssign, setSelectedRoleForAssign] = useState(null)
-    const [selectedRoleForView, setSelectedRoleForView] = useState(null)
-    const [permissionStates, setPermissionStates] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [fetchLoading, setFetchLoading] = useState(true)
+    // State for tabs
+    const [tabValue, setTabValue] = useState(0);
 
+    // State for data
+    const [roles, setRoles] = useState([]);
+    const [permissions, setPermissions] = useState([]);
+    const [rolePermissions, setRolePermissions] = useState([]);
+
+    // Separate state for selected role in permission assign
+    const [selectedRoleForAssign, setSelectedRoleForAssign] = useState(null);
+
+    // Separate state for selected role in role permissions view
+    const [selectedRoleForView, setSelectedRoleForView] = useState(null);
+
+    // State for permission assign
+    const [permissionStates, setPermissionStates] = useState([]);
+
+    // State for loading
+    const [loading, setLoading] = useState(false);
+    const [fetchLoading, setFetchLoading] = useState(true);
+
+    // 🔥 Helper to safely extract array from any API response structure
+    const extractArray = (res) => {
+        if (Array.isArray(res?.data?.data)) return res.data.data;
+        if (Array.isArray(res?.data)) return res.data;
+        if (Array.isArray(res)) return res;
+        return [];
+    };
+
+    // Load all data from APIs
     const loadAllData = async () => {
-        setFetchLoading(true)
+        setFetchLoading(true);
         try {
+            // ✅ FIX: Use 'api' (lowercase) instead of 'API'
             const [rolesRes, permissionsRes, rolePermissionsRes] = await Promise.all([
-                api.get('/api/roles'),
-                api.get('/api/permissions'),
-                api.get('/api/rolepermissions'),
-            ])
-            const rolesData = rolesRes?.data || []
-            const permissionsData = permissionsRes?.data || []
-            const rolePermissionsData = rolePermissionsRes?.data || []
+                api.get("/api/roles"),
+                api.get("/api/permissions"),
+                api.get("/api/rolepermissions"),
+            ]);
 
-            setRoles(rolesData)
-            setPermissions(permissionsData)
-            setRolePermissions(rolePermissionsData)
+            //  FIX: Safely extract arrays regardless of response structure
+            const rolesData = extractArray(rolesRes);
+            const permissionsData = extractArray(permissionsRes);
+            const rolePermissionsData = extractArray(rolePermissionsRes);
 
+            console.log("✅ Roles:", rolesData);
+            console.log("✅ Permissions:", permissionsData);
+            console.log("✅ RolePermissions:", rolePermissionsData);
+
+            setRoles(rolesData);
+            setPermissions(permissionsData);
+            setRolePermissions(rolePermissionsData);
+
+            // If there's a selected role in assign tab, update its permission states
             if (selectedRoleForAssign) {
-                const updatedRole = rolesData.find((r) => r.roleId === selectedRoleForAssign.roleId)
+                const updatedRole = rolesData.find(
+                    (r) => r.roleId === selectedRoleForAssign.roleId,
+                );
                 if (updatedRole) {
-                    setSelectedRoleForAssign(updatedRole)
-                    const rolePerms = rolePermissionsData.filter((rp) => rp.roleId === updatedRole.roleId)
+                    setSelectedRoleForAssign(updatedRole);
+                    const rolePerms = rolePermissionsData.filter(
+                        (rp) => rp.roleId === updatedRole.roleId,
+                    );
                     const updatedPermissions = permissionsData.map((permission) => ({
                         ...permission,
-                        isAllowed: rolePerms.some((rp) => rp.permissionId === permission.permissionId && rp.isAllowed),
-                    }))
-                    setPermissionStates(updatedPermissions)
+                        isAllowed: rolePerms.some(
+                            (rp) =>
+                                rp.permissionId === permission.permissionId && rp.isAllowed,
+                        ),
+                    }));
+                    setPermissionStates(updatedPermissions);
                 }
             }
+
+            // If there's a selected role in view tab, update it
             if (selectedRoleForView) {
-                const updatedRole = rolesData.find((r) => r.roleId === selectedRoleForView.roleId)
-                if (updatedRole) setSelectedRoleForView(updatedRole)
+                const updatedRole = rolesData.find(
+                    (r) => r.roleId === selectedRoleForView.roleId,
+                );
+                if (updatedRole) {
+                    setSelectedRoleForView(updatedRole);
+                }
             }
-            toast.success('Data loaded successfully!')
+
+            toast.success("Data loaded successfully!");
         } catch (error) {
-            toast.error(error?.message || 'Failed to load data!')
+            console.error("Error loading data:", error);
+            toast.error(error?.response?.data?.message || "Failed to load data!");
         } finally {
-            setFetchLoading(false)
+            setFetchLoading(false);
         }
-    }
+    };
 
     useEffect(() => {
-        loadAllData()
-    }, [])
+        loadAllData();
+    }, []);
 
-    const handleTabChange = (index) => setTabValue(index)
-    const handleRolesUpdate = (updatedRoles) => setRoles(updatedRoles)
+    // Tab Change Handler
+    const handleTabChange = (index) => {
+        setTabValue(index);
+    };
 
+    // Role Creation Handlers
+    const handleRolesUpdate = (updatedRoles) => {
+        setRoles(updatedRoles);
+    };
+
+    // Permission Assign Handlers
     const handleSelectRoleForAssign = (role) => {
-        setSelectedRoleForAssign(role)
-        const rolePerms = rolePermissions.filter((rp) => rp.roleId === role.roleId)
+        setSelectedRoleForAssign(role);
+        // Get permissions for this role
+        const rolePerms = rolePermissions.filter((rp) => rp.roleId === role.roleId);
+        // Update permission states - show ALL permissions with their current status
         const updatedPermissions = permissions.map((permission) => ({
             ...permission,
-            isAllowed: rolePerms.some((rp) => rp.permissionId === permission.permissionId && rp.isAllowed),
-        }))
-        setPermissionStates(updatedPermissions)
-    }
+            isAllowed: rolePerms.some(
+                (rp) => rp.permissionId === permission.permissionId && rp.isAllowed,
+            ),
+        }));
+        setPermissionStates(updatedPermissions);
+    };
 
     const handlePermissionToggle = (permissionId) => {
-        setPermissionStates(permissionStates.map((p) => (p.permissionId === permissionId ? { ...p, isAllowed: !p.isAllowed } : p)))
-    }
+        setPermissionStates(
+            permissionStates.map((p) =>
+                p.permissionId === permissionId ? { ...p, isAllowed: !p.isAllowed } : p,
+            ),
+        );
+    };
 
     const handleSavePermissions = async () => {
         if (!selectedRoleForAssign) {
-            toast.error('Please select a role first!')
-            return
+            toast.error("Please select a role first!");
+            return;
         }
+
+        // Create payload in the required format
         const payload = {
             roleId: selectedRoleForAssign.roleId,
             permissions: permissionStates.map((permission) => ({
                 permissionId: permission.permissionId,
                 isAllowed: Boolean(permission.isAllowed),
             })),
-        }
-        setLoading(true)
+        };
+
+        setLoading(true);
         try {
-            await api.post('/api/rolepermissions', payload)
-            const updatedRolePermissions = await api.get('/api/rolepermissions')
-            const latestRolePermissions = updatedRolePermissions?.data || []
-            setRolePermissions(latestRolePermissions)
-            const rolePerms = latestRolePermissions.filter((rp) => rp.roleId === selectedRoleForAssign.roleId)
+            // ✅ FIX: Use 'api' (lowercase)
+            await api.post("/api/rolepermissions", payload);
+
+            // Reload latest role permissions
+            const updatedRolePermissions = await api.get("/api/rolepermissions");
+            const latestRolePermissions = extractArray(updatedRolePermissions);
+            setRolePermissions(latestRolePermissions);
+
+            // Update permission states for selected role
+            const rolePerms = latestRolePermissions.filter(
+                (rp) => rp.roleId === selectedRoleForAssign.roleId,
+            );
             const updatedPermissionStates = permissions.map((permission) => ({
                 ...permission,
-                isAllowed: rolePerms.some((rp) => rp.permissionId === permission.permissionId && rp.isAllowed),
-            }))
-            setPermissionStates(updatedPermissionStates)
+                isAllowed: rolePerms.some(
+                    (rp) => rp.permissionId === permission.permissionId && rp.isAllowed,
+                ),
+            }));
+            setPermissionStates(updatedPermissionStates);
+
+            // Also update the view tab's selected role data
             if (selectedRoleForView?.roleId === selectedRoleForAssign.roleId) {
-                setSelectedRoleForView(selectedRoleForAssign)
+                setSelectedRoleForView(selectedRoleForAssign);
             }
-            toast.success('Permissions saved successfully!')
+
+            toast.success("Permissions saved successfully!");
         } catch (error) {
-            toast.error(error?.message || 'Failed to save permissions!')
+            console.error("Error saving permissions:", error);
+            toast.error(
+                error?.response?.data?.message || "Failed to save permissions!",
+            );
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
-    }
+    };
 
-    const handleSelectRoleForView = (role) => setSelectedRoleForView(role)
+    // Role Permission Assigned Handlers
+    const handleSelectRoleForView = (role) => {
+        setSelectedRoleForView(role);
+    };
 
+    // Get action color
     const getActionColor = (action) => {
         const colors = {
-            VIEW: 'bg-sky-500/15 text-sky-400',
-            CREATE: 'bg-emerald-500/15 text-emerald-400',
-            UPDATE: 'bg-amber-500/15 text-amber-400',
-            DELETE: 'bg-rose-500/15 text-rose-400',
-            APPROVE: 'bg-purple-500/15 text-purple-400',
-            READ: 'bg-primary-soft text-primary',
-            EXECUTE: 'bg-purple-500/15 text-purple-400',
-            MANAGE: 'bg-primary-soft text-primary',
-        }
-        return colors[action] || 'bg-bg text-mut border border-line'
-    }
+            VIEW: "bg-blue-100 text-blue-800",
+            CREATE: "bg-green-100 text-green-800",
+            UPDATE: "bg-yellow-100 text-yellow-800",
+            DELETE: "bg-red-100 text-red-800",
+            APPROVE: "bg-purple-100 text-purple-800",
+            READ: "bg-sky-100 text-sky-800",
+            MANAGE: "bg-indigo-100 text-indigo-800",
+            EXECUTE: "bg-violet-100 text-violet-800",
+        };
+        return colors[action] || "bg-gray-100 text-gray-800";
+    };
 
     if (fetchLoading) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-                    <p className="mt-4 text-mut font-bold">Loading permissions...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading permissions...</p>
                 </div>
             </div>
-        )
+        );
     }
 
-    const TABS = [
-        { label: 'Role Creation', icon: Users, count: roles.length },
-        { label: 'Permission Assign', icon: Key, badge: selectedRoleForAssign?.roleName },
-        { label: 'Role Permissions', icon: Shield, badge: selectedRoleForView?.roleName },
-    ]
-
     return (
-        <div className="space-y-4">
-            {/* HEADER */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-primary rounded-xl">
-                        <Shield className="text-bg" size={24} />
+        <div className="w-full p-6 bg-gray-50 min-h-screen">
+            {/* Header */}
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <div className="bg-blue-100 p-3 rounded-lg">
+                        <Shield className="text-blue-600" size={32} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-extrabold text-ink">🔐 User Permissions</h1>
-                        <p className="text-xs text-mut font-bold">Manage roles and permissions for your application</p>
+                        <h1 className="text-2xl font-bold text-gray-900">
+                            User Permissions Management
+                        </h1>
+                        <p className="text-gray-600 text-sm">
+                            Manage roles and permissions for your application
+                        </p>
                     </div>
                 </div>
-                <Button variant="soft" onClick={loadAllData} disabled={loading}>
-                    <RefreshCw size={14} className={cn('inline mr-1', loading && 'animate-spin')} />
-                    {loading ? 'Loading...' : 'Refresh'}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={loadAllData}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-3 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+                        {loading ? "Loading..." : "Refresh"}
+                    </button>
+                </div>
             </div>
 
-            {/* TABS */}
-            <Card className="p-0 overflow-hidden">
-                <div className="border-b border-line">
-                    <nav className="flex overflow-x-auto">
-                        {TABS.map((t, i) => {
-                            const Icon = t.icon
-                            return (
-                                <button
-                                    key={i}
-                                    onClick={() => handleTabChange(i)}
-                                    className={cn(
-                                        'flex items-center gap-2 px-5 py-3.5 text-xs font-bold border-b-2 transition whitespace-nowrap',
-                                        tabValue === i
-                                            ? 'border-primary text-primary'
-                                            : 'border-transparent text-mut hover:text-ink hover:border-line'
-                                    )}
-                                >
-                                    <Icon size={16} />
-                                    {t.label}
-                                    {t.count !== undefined && (
-                                        <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-bg border border-line text-mut rounded-full">
-                                            {t.count}
-                                        </span>
-                                    )}
-                                    {t.badge && (
-                                        <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-primary-soft text-primary rounded-full">
-                                            {t.badge}
-                                        </span>
-                                    )}
-                                </button>
-                            )
-                        })}
+            {/* Tabs */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="border-b border-gray-200">
+                    <nav className="flex -mb-px overflow-x-auto">
+                        <button
+                            onClick={() => handleTabChange(0)}
+                            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tabValue === 0
+                                    ? "border-blue-500 text-blue-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                }`}
+                        >
+                            <Users size={18} />
+                            Role Creation
+                            <span className="ml-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">
+                                {roles.length}
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => handleTabChange(1)}
+                            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tabValue === 1
+                                    ? "border-blue-500 text-blue-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                }`}
+                        >
+                            <Key size={18} />
+                            Permission Assign
+                            {selectedRoleForAssign && (
+                                <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
+                                    {selectedRoleForAssign.roleName}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => handleTabChange(2)}
+                            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tabValue === 2
+                                    ? "border-blue-500 text-blue-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                }`}
+                        >
+                            <Shield size={18} />
+                            Role Permission Assigned
+                            {selectedRoleForView && (
+                                <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
+                                    {selectedRoleForView.roleName}
+                                </span>
+                            )}
+                        </button>
                     </nav>
                 </div>
 
+                {/* Tab 1: Role Creation */}
                 <TabPanel value={tabValue} index={0}>
-                    <RoleCreationTab roles={roles} onRolesUpdate={handleRolesUpdate} loadAllData={loadAllData} />
+                    <RoleCreationTab
+                        roles={roles}
+                        onRolesUpdate={handleRolesUpdate}
+                        loadAllData={loadAllData}
+                    />
                 </TabPanel>
+
+                {/* Tab 2: Permission Assign */}
                 <TabPanel value={tabValue} index={1}>
                     <PermissionAssignTab
                         roles={roles}
@@ -220,6 +325,8 @@ export default function UserPermissionsPage() {
                         loading={loading}
                     />
                 </TabPanel>
+
+                {/* Tab 3: Role Permission Assigned */}
                 <TabPanel value={tabValue} index={2}>
                     <RolePermissionAssignedTab
                         roles={roles}
@@ -229,7 +336,7 @@ export default function UserPermissionsPage() {
                         getActionColor={getActionColor}
                     />
                 </TabPanel>
-            </Card>
+            </div>
         </div>
-    )
+    );
 }
