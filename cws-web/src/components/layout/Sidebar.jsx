@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthProvider'
+import { useAuth , AuthProvider } from '@/contexts/AuthProvider'
 import { useQuery } from '@tanstack/react-query'
 import { PanelLeftClose, PanelLeftOpen, LogOut, User } from 'lucide-react'
 import { NAV } from '@/config/nav'
