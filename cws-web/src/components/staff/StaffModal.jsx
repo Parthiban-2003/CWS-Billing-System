@@ -11,9 +11,9 @@ import { ROLES } from '@/config/roles'
 const BLANK = {
     name: '',
     phone: '',
-    role: 'CASHIER',
+    role: '',
     salary: '',
-    payrollType: 'FIXED', // 👈 Default Fixed
+    payrollType: 'FIXED', 
     pin: '',
     joinDate: new Date().toISOString().split('T')[0],
 }
