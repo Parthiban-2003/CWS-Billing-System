@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthProvider'
+import { useAuth , AuthProvider } from '@/contexts/AuthProvider'
 import { ShieldAlert } from 'lucide-react'
 
 export default function ProtectedRoute({ children, permission }) {
