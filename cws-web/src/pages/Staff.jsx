@@ -19,8 +19,9 @@ export default function Staff() {
 
     const qc = useQueryClient()
 
+    // 1. Fetch data (Rename 'data' to 'response' to avoid confusion)
     const {
-        data: staff = [],
+        data: response,
         isLoading,
         isError,
     } = useQuery({
@@ -28,6 +29,12 @@ export default function Staff() {
         queryFn: () => api.get('/api/staff'),
     })
 
+    // 🔥 2. FIX: Safely extract the array from the response
+    // Backend returns { data: [...] }, so we check nested structures
+    const rawStaff = response?.data?.data || response?.data || []
+    const staff = Array.isArray(rawStaff) ? rawStaff : []
+
+    // 3. Now filter is safe
     const active = staff.filter((s) => s.isActive)
 
     const monthlyTotal = active.reduce(
@@ -35,13 +42,14 @@ export default function Staff() {
         0
     )
 
+    // 🔥 4. FIX: Handle role as object (s.role?.roleCode)
     const list = staff.filter(
-        (s) => filter === 'ALL' || s.role === filter
+        (s) => filter === 'ALL' || s.role?.roleCode === filter
     )
 
     const toggleActive = async (s) => {
         // Never allow owner to be disabled
-        if (s.role === 'OWNER') {
+        if (s.role?.roleCode === 'OWNER') {
             toast.error('Owner cannot be deactivated 🔒')
             return
         }
@@ -65,7 +73,7 @@ export default function Staff() {
 
     const requestDelete = (s) => {
         // OWNER DELETE PROTECTION
-        if (s.role === 'OWNER') {
+        if (s.role?.roleCode === 'OWNER') {
             toast.error('Owner account cannot be deleted 🔒')
             return
         }
@@ -77,7 +85,7 @@ export default function Staff() {
         if (!del) return
 
         // Double protection
-        if (del.role === 'OWNER') {
+        if (del.role?.roleCode === 'OWNER') {
             toast.error('Owner account cannot be deleted 🔒')
             setDel(null)
             return
@@ -168,7 +176,7 @@ export default function Staff() {
                         )}
                     >
                         {r.l} (
-                        {staff.filter((s) => s.role === r.id).length}
+                        {staff.filter((s) => s.role?.roleCode === r.id).length}
                         )
                     </button>
                 ))}
@@ -228,8 +236,9 @@ export default function Staff() {
             {!isLoading && !isError && list.length > 0 && (
                 <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
                     {list.map((s) => {
-                        const role = roleInfo(s.role)
-                        const isOwner = s.role === 'OWNER'
+                        // 🔥 5. FIX: Pass roleCode to roleInfo, not the whole object
+                        const role = roleInfo(s.role?.roleCode)
+                        const isOwner = s.role?.roleCode === 'OWNER'
 
                         return (
                             <Card
@@ -251,7 +260,7 @@ export default function Staff() {
                                         </p>
 
                                         <p className="text-xs text-mut font-bold truncate">
-                                            {role?.l || s.role}
+                                            {role?.l || s.role?.roleCode || 'No Role'}
                                             {s.phone ? ` · ${s.phone}` : ''}
                                         </p>
                                     </div>

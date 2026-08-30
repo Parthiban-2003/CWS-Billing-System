@@ -2,11 +2,37 @@ import { NextResponse } from 'next/server'
 import { list, create, staffSchema } from '@modules/staff'
 
 export async function GET() {
-    return NextResponse.json(await list())
+    try {
+        const data = await list()
+        return NextResponse.json({ data })
+    } catch (error: any) {
+        console.error('Staff GET error:', error)
+        return NextResponse.json(
+            { error: error.message || 'Failed to load staff' },
+            { status: 500 }
+        )
+    }
 }
 
 export async function POST(req: Request) {
-    const p = staffSchema.safeParse(await req.json())
-    if (!p.success) return NextResponse.json({ error: p.error.issues }, { status: 400 })
-    return NextResponse.json(await create(p.data), { status: 201 })
+    try {
+        const body = await req.json()
+        const parsed = staffSchema.safeParse(body)
+
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues },
+                { status: 400 }
+            )
+        }
+
+        const data = await create(parsed.data)
+        return NextResponse.json({ data }, { status: 201 })
+    } catch (error: any) {
+        console.error('Staff POST error:', error)
+        return NextResponse.json(
+            { error: error.message || 'Failed to create staff' },
+            { status: 500 }
+        )
+    }
 }
