@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Lock, User, Fingerprint, Loader2, Shield } from 'lucide-react'
+import { Lock, User, Fingerprint, Loader2, Shield, AlertCircle } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthProvider'
 import { cn } from '@/lib/utils'
@@ -17,18 +17,43 @@ export default function Login() {
 
     // Redirect if already logged in
     useEffect(() => {
-        if (isAuthenticated) navigate('/app', { replace: true })
+        if (isAuthenticated) {
+            navigate('/app', { replace: true })
+        }
     }, [isAuthenticated, navigate])
 
-    // Load active staff list
+    // 🔥 FIX: Load active staff list with proper response handling
     useEffect(() => {
         const loadStaff = async () => {
             try {
-                const data = await api.get('/api/staff')
-                const active = (Array.isArray(data) ? data : []).filter((s) => s.isActive)
-                setStaffList(active)
-            } catch (e) {
+                setLoadingStaff(true)
+                const response = await api.get('/api/staff')
+
+                // 🔥 Handle different response structures
+                let staffData = []
+                if (response?.data?.data) {
+                    staffData = response.data.data
+                } else if (response?.data) {
+                    staffData = response.data
+                } else if (Array.isArray(response)) {
+                    staffData = response
+                }
+
+                // Filter only active staff
+                const activeStaff = Array.isArray(staffData)
+                    ? staffData.filter((s) => s.isActive !== false)
+                    : []
+
+                console.log('📋 Loaded staff:', activeStaff.length, 'members')
+                setStaffList(activeStaff)
+
+                if (activeStaff.length === 0) {
+                    toast.warning('No active staff found in database')
+                }
+            } catch (error) {
+                console.error('Failed to load staff:', error)
                 toast.error('Failed to load staff list')
+                setStaffList([])
             } finally {
                 setLoadingStaff(false)
             }
@@ -38,26 +63,30 @@ export default function Login() {
 
     const handleLogin = async (e) => {
         e?.preventDefault()
+
         if (!staffId) {
-            toast.error('Please select staff')
+            toast.error('Please select a staff member')
             return
         }
         if (pin.length !== 4) {
-            toast.error('PIN must be 4 digits')
+            toast.error('PIN must be exactly 4 digits')
             return
         }
 
         setLoading(true)
         try {
-            const device = `${navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Browser'}`
+            const device = `${navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Browser'} / ${navigator.platform}`
             const res = await login(staffId, pin, device)
-            if (res.success) {
-                toast.success(`Welcome back, ${res.user.name}! 👋`)
+
+            if (res?.success) {
+                toast.success(`Welcome back, ${res.user?.name || 'User'}! 👋`)
                 navigate('/app', { replace: true })
             }
         } catch (err) {
-            toast.error(err?.message || 'Login failed ❌')
-            setPin('')
+            console.error('Login error:', err)
+            const errorMsg = err?.response?.data?.error || err?.message || 'Login failed'
+            toast.error(errorMsg)
+            setPin('') // Clear PIN on failure
         } finally {
             setLoading(false)
         }
@@ -67,6 +96,8 @@ export default function Login() {
         const cleaned = value.replace(/\D/g, '').slice(0, 4)
         setPin(cleaned)
     }
+
+    const selectedStaff = staffList.find((s) => s.id === staffId)
 
     return (
         <div className="min-h-screen bg-bg flex items-center justify-center p-4 relative overflow-hidden">
@@ -106,11 +137,17 @@ export default function Login() {
                                 </option>
                                 {staffList.map((s) => (
                                     <option key={s.id} value={s.id}>
-                                        {s.name} ({s.role})
+                                        {s.name} {s.role?.roleCode ? `(${s.role.roleCode})` : s.roleId ? '' : '(No Role)'}
                                     </option>
                                 ))}
                             </select>
                         </div>
+                        {selectedStaff && !selectedStaff.roleId && (
+                            <p className="text-[10px] text-amber-400 mt-1.5 flex items-center gap-1">
+                                <AlertCircle size={10} />
+                                This staff has no role assigned. Contact admin.
+                            </p>
+                        )}
                     </div>
 
                     {/* PIN Input */}
@@ -174,7 +211,7 @@ export default function Login() {
 
                     {/* Help Text */}
                     <p className="text-[10px] text-mut text-center pt-2 border-t border-line">
-                        🔒 Forgot PIN? Contact system administrator
+                        Forgot PIN? Contact system administrator
                     </p>
                 </div>
 
