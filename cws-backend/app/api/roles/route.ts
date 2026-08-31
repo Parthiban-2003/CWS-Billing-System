@@ -1,27 +1,38 @@
 import { NextResponse } from 'next/server'
-import { listRoles, createRole } from '@modules/roles'
+import { list, create, roleSchema } from '@modules/roles'
 
 export async function GET() {
     try {
-        const data = await listRoles()
+        const data = await list()
         return NextResponse.json({ data })
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 })
+    } catch (error: any) {
+        console.error('Roles GET error:', error)
+        return NextResponse.json(
+            { error: error.message || 'Failed to load roles' },
+            { status: 500 }
+        )
     }
 }
 
 export async function POST(req: Request) {
     try {
         const body = await req.json()
-        if (!body.roleCode || !body.roleName) {
-            return NextResponse.json({ error: 'Role code and name required' }, { status: 400 })
+        const parsed = roleSchema.safeParse(body)
+        
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues },
+                { status: 400 }
+            )
         }
-        const data = await createRole(body)
+        
+        const data = await create(parsed.data)
         return NextResponse.json({ data }, { status: 201 })
-    } catch (e: any) {
-        if (e.code === 'P2002') {
-            return NextResponse.json({ error: 'Role code already exists' }, { status: 400 })
-        }
-        return NextResponse.json({ error: e.message }, { status: 500 })
+    } catch (error: any) {
+        console.error('Roles POST error:', error)
+        return NextResponse.json(
+            { error: error.message || 'Failed to create role' },
+            { status: 500 }
+        )
     }
 }

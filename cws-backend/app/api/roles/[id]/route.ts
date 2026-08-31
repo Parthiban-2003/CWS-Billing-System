@@ -1,23 +1,58 @@
 import { NextResponse } from 'next/server'
-import { updateRole, deleteRole } from '@modules/roles'
+import { update, remove } from '@modules/roles'
+import { z } from 'zod'
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params
+// Schema for update (partial)
+const updateSchema = z.object({
+    roleCode: z.string().min(1).optional(),
+    roleName: z.string().min(1).optional(),
+    roleNameTamil: z.string().optional().nullable(),
+    description: z.string().optional().nullable(),
+    roleLevel: z.number().min(0).max(100).optional(),
+    isSystemRole: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+})
+
+export async function PATCH(
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
     try {
+        const { id } = await params
         const body = await req.json()
-        const data = await updateRole(id, body)
+
+        const parsed = updateSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: parsed.error.issues },
+                { status: 400 }
+            )
+        }
+
+        const data = await update(id, parsed.data)
         return NextResponse.json({ data })
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 })
+    } catch (error: any) {
+        console.error('Role PATCH error:', error)
+        return NextResponse.json(
+            { error: error.message || 'Failed to update role' },
+            { status: 500 }
+        )
     }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params
+export async function DELETE(
+    _req: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        await deleteRole(id)
+        const { id } = await params
+        await remove(id)
         return NextResponse.json({ ok: true })
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 400 })
+    } catch (error: any) {
+        console.error('Role DELETE error:', error)
+        return NextResponse.json(
+            { error: error.message || 'Failed to delete role' },
+            { status: 500 }
+        )
     }
 }
