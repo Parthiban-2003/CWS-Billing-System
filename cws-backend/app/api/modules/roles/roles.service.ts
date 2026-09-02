@@ -1,5 +1,17 @@
 import { prisma } from '@/database/client'
 import { DEV_TENANT_ID } from '@/config/tenant'
+import { z } from 'zod'
+
+// Zod Schema for Role Validation
+export const roleSchema = z.object({
+    roleCode: z.string().min(1, 'Role code is required'),
+    roleName: z.string().min(1, 'Role name is required'),
+    roleNameTamil: z.string().optional().nullable(),
+    description: z.string().optional().nullable(),
+    roleLevel: z.number().min(0).max(100).default(0),
+    isSystemRole: z.boolean().default(false),
+    isActive: z.boolean().default(true),
+})
 
 const clean = (r: any) => ({
     roleId: r.id,
@@ -10,9 +22,12 @@ const clean = (r: any) => ({
     roleLevel: r.roleLevel,
     isSystemRole: r.isSystemRole,
     isActive: r.isActive,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
 })
 
-export const listRoles = async () => {
+// List all roles
+export const list = async () => {
     const roles = await prisma.role.findMany({
         where: { tenantId: DEV_TENANT_ID },
         orderBy: { roleLevel: 'desc' },
@@ -20,7 +35,8 @@ export const listRoles = async () => {
     return roles.map(clean)
 }
 
-export const createRole = async (data: any) => {
+// Create role
+export const create = async (data: z.infer<typeof roleSchema>) => {
     const role = await prisma.role.create({
         data: {
             tenantId: DEV_TENANT_ID,
@@ -28,7 +44,7 @@ export const createRole = async (data: any) => {
             roleName: data.roleName,
             roleNameTamil: data.roleNameTamil || null,
             description: data.description || null,
-            roleLevel: Number(data.roleLevel) || 0,
+            roleLevel: data.roleLevel || 0,
             isSystemRole: data.isSystemRole || false,
             isActive: data.isActive !== false,
         },
@@ -36,25 +52,33 @@ export const createRole = async (data: any) => {
     return clean(role)
 }
 
-export const updateRole = async (id: string, data: any) => {
+// Update role
+export const update = async (id: string, data: Partial<z.infer<typeof roleSchema>>) => {
+    const updateData: any = { ...data }
+
+    if (data.roleCode) {
+        updateData.roleCode = data.roleCode.toUpperCase()
+    }
+
     const role = await prisma.role.update({
         where: { id },
-        data: {
-            ...(data.roleCode && { roleCode: data.roleCode.toUpperCase() }),
-            ...(data.roleName && { roleName: data.roleName }),
-            ...(data.roleNameTamil !== undefined && { roleNameTamil: data.roleNameTamil || null }),
-            ...(data.description !== undefined && { description: data.description || null }),
-            ...(data.roleLevel !== undefined && { roleLevel: Number(data.roleLevel) }),
-            ...(data.isActive !== undefined && { isActive: data.isActive }),
-        },
+        data: updateData,
     })
+
     return clean(role)
 }
 
-export const deleteRole = async (id: string) => {
+// Delete role
+export const remove = async (id: string) => {
+    // Check if role is system role
     const role = await prisma.role.findUnique({ where: { id } })
-    if (!role) throw new Error('Role not found')
-    if (role.isSystemRole) throw new Error('System roles cannot be deleted')
+    if (!role) {
+        throw new Error('Role not found')
+    }
+    if (role.isSystemRole) {
+        throw new Error('System roles cannot be deleted')
+    }
+
     await prisma.role.delete({ where: { id } })
     return { ok: true }
 }
