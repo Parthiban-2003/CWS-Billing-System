@@ -1,6 +1,7 @@
 import {
     LayoutDashboard,
     ShoppingCart,
+    Building2,
     Utensils,
     Armchair,
     CalendarDays,
@@ -24,6 +25,14 @@ export const NAV = [
         end: true,
         permission: 'DASHBOARD.READ',
     },
+
+    {
+        path: '/app/branches',
+        label: 'Branches',
+        icon: Building2,
+        permission: 'Branches.READ',
+    },
+
     {
         path: '/app/pos',
         label: 'POS',
