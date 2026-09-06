@@ -10,6 +10,7 @@ import ProtectedRoute from '@/components/ProtectedRoute/ProtectedRoute'
 import AppLayout from '@/components/layout/AppLayout'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
+import Branches from '@/pages/Branches'
 import Settings from '@/pages/Settings'
 import POS from '@/pages/POS'
 import Menu from '@/pages/Menu'
@@ -50,6 +51,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute permission="DASHBOARD.READ">
                         <Dashboard />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: 'branches',
+                element: (
+                    <ProtectedRoute permission="Branches.READ">
+                        <Branches />
                     </ProtectedRoute>
                 ),
             },
