@@ -32,6 +32,34 @@ model Tenant {
   notifications Notification[]
   settings      TenantSetting?
   roles         Role[]
+  branches      Branch[]
+}
+
+// ─────────────────────────────────────────────
+// Branch
+// ─────────────────────────────────────────────
+model Branch {
+  id              String   @id @default(uuid())
+  tenantId        String
+  branchCode      String   @unique
+  branchName      String
+  branchNameTamil String?
+  address         String?
+  city            String?
+  state           String?
+  pincode         String?
+  phone           String?
+  email           String?
+  contactPerson   String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff  Staff[]
+
+  @@index([tenantId])
+  @@index([branchCode])
 }
 
 // ─────────────────────────────────────────────
@@ -88,6 +116,8 @@ model Staff {
   attendance Attendance[]
   payrolls   Payroll[]
   sessions   Session[]
+  branch     Branch?      @relation(fields: [branchId], references: [id])
+  branchId   String?
 
   @@index([tenantId, roleId])
 }
